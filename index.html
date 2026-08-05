@@ -8,6 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="config.js"></script>
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Tally">
 <meta name="theme-color" content="#EDEFEA">
@@ -234,12 +235,13 @@ var COLORS = ['--c0','--c1','--c2','--c3','--c4','--c5'];
 var PRESETS = ['Go to the gym','Read for 30 minutes','Meditate','Clean the house','Cook a meal','Sleep before 11pm','Walk outside','Stretch','No phone in bed','Journal','Call family','Practice an instrument'];
 
 /* =========================================================
-   SELF-HOSTING CONFIG — fill these two in and the app talks
-   to your own Supabase project instead of Claude's storage.
-   Leave them blank and it falls back to this-device-only.
+   Backend config lives in config.js so that updating this file
+   never wipes your credentials. If config.js is missing, the app
+   falls back to storing everything on this device only.
    ========================================================= */
-var SUPABASE_URL = '';   // e.g. 'https://abcdefgh.supabase.co'
-var SUPABASE_KEY = '';   // your project's anon / publishable key
+var CFG = (typeof window.TALLY_CONFIG === 'object' && window.TALLY_CONFIG) || {};
+var SUPABASE_URL = CFG.url || '';
+var SUPABASE_KEY = CFG.key || '';
 
 /* ---------- storage backends ---------- */
 var BACKEND = (typeof window.storage !== 'undefined' && window.storage) ? 'claude'
