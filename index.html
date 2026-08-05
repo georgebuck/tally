@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tally — habit pots</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tally">
+<meta name="theme-color" content="#EDEFEA">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23161C1A'/%3E%3Crect x='14' y='14' width='14' height='14' rx='3' fill='%232C4EE0'/%3E%3Crect x='36' y='14' width='14' height='14' rx='3' fill='%23D91E63'/%3E%3Crect x='14' y='36' width='14' height='14' rx='3' fill='%23EDEFEA'/%3E%3Crect x='36' y='36' width='14' height='14' rx='3' fill='%23EDEFEA' opacity='.35'/%3E%3C/svg%3E">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --paper:#EDEFEA;
+  --card:#FFFFFF;
+  --ink:#161C1A;
+  --soft:#5E6A64;
+  --rule:#D2D8D0;
+  --gold:#E0A805;
+  --c0:#2C4EE0;
+  --c1:#D91E63;
+  --c2:#0E8A6A;
+  --c3:#7A3BD1;
+  --c4:#C25E00;
+  --c5:#0B7FA8;
+  --display:'Bricolage Grotesque','Helvetica Neue',Helvetica,Arial,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select{font:inherit;color:inherit}
+
+#app{max-width:560px;margin:0 auto;padding:0 18px 56px;min-height:100vh}
+@media (min-width:500px){.keys{grid-template-columns:repeat(3,1fr)}}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 14px;min-height:62px}
+.brand{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em}
+.brand span{display:inline-block;width:9px;height:9px;background:var(--ink);margin-right:7px;vertical-align:2px}
+.back{
+  display:inline-flex;align-items:center;gap:9px;background:none;border:none;padding:4px 0;
+  min-width:0;text-align:left;
+}
+.back .arrow{font-family:var(--mono);font-size:16px;color:var(--soft)}
+.back .pn{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{
+  display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--ink);background:transparent;
+  border-radius:999px;padding:5px 12px 5px 8px;font-family:var(--mono);font-size:12px;flex:none;
+}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
+
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--soft)}
+.rule{height:1px;background:var(--rule);margin:22px 0}
+.muted{color:var(--soft)}
+
+/* ---------- pot cards (home) ---------- */
+.pot{
+  display:block;width:100%;text-align:left;background:var(--card);border:2px solid var(--ink);
+  border-radius:13px;padding:15px 15px 13px;box-shadow:3px 3px 0 var(--ink);margin-bottom:13px;
+  transition:transform .07s ease,box-shadow .07s ease;
+}
+.pot:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.pot .ph{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}
+.pot .pname{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.03em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pot .pscore{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.03em;flex:none}
+.pot .pscore em{font-style:normal;font-weight:600;font-size:14px;color:var(--soft)}
+.pot .pmeta{font-family:var(--mono);font-size:11px;color:var(--soft);letter-spacing:.03em;margin-bottom:9px}
+.mini{display:grid;gap:3px;grid-template-columns:repeat(auto-fill,minmax(11px,1fr))}
+.mini i{aspect-ratio:1/1;border-radius:2px;background:var(--rule)}
+.mini i.f{background:var(--ink)}
+.tag{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--rule);border-radius:999px;padding:2px 7px;color:var(--soft);
+}
+.tag.priv{border-color:var(--ink);color:var(--ink)}
+
+/* ---------- week header ---------- */
+.weeknav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.weeknav button{background:none;border:none;padding:6px 10px;font-family:var(--mono);font-size:16px;color:var(--soft);border-radius:6px}
+.weeknav button:hover:not(:disabled){color:var(--ink);background:rgba(0,0,0,.05)}
+.weeknav button:disabled{opacity:.22;cursor:default}
+.weeklabel{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-align:center}
+
+.scoreline{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.score{font-family:var(--display);font-weight:800;font-size:76px;line-height:.82;letter-spacing:-.045em}
+.goal{font-family:var(--display);font-weight:600;font-size:26px;color:var(--soft);letter-spacing:-.02em}
+.metflag{margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;border:1.5px solid var(--gold);color:#8A6702;background:#FBF1D2;padding:4px 9px;border-radius:999px}
+
+/* ---------- tally grid ---------- */
+.tally{display:grid;gap:5px;margin:4px 0 16px}
+.cell{aspect-ratio:1/1;border:1.5px solid var(--rule);border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:#fff;font-weight:500;padding:0;overflow:hidden}
+.cell.empty{background:transparent;border-style:dashed}
+.cell.filled{border-color:var(--ink);box-shadow:1.5px 1.5px 0 var(--ink)}
+.cell.bonus{border-color:var(--gold);box-shadow:1.5px 1.5px 0 var(--gold)}
+.cell.pop{animation:stamp .26s cubic-bezier(.2,1.5,.4,1)}
+@keyframes stamp{0%{transform:scale(.4) rotate(-9deg);opacity:0}60%{transform:scale(1.12) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+.bonusrule{grid-column:1/-1;height:1px;background:var(--gold);margin:5px 0 1px;opacity:.6}
+
+.split{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;border:1px solid var(--rule);background:var(--card);border-radius:999px;padding:4px 10px}
+
+/* ---------- habit keys ---------- */
+.keys{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.key{position:relative;text-align:left;background:var(--card);border:2px solid var(--ink);border-radius:11px;padding:15px 13px 13px;box-shadow:3px 3px 0 var(--ink);transition:transform .07s ease,box-shadow .07s ease;min-height:78px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.key:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.key .name{font-weight:600;font-size:15px;line-height:1.22;letter-spacing:-.01em}
+.key .pts{font-family:var(--mono);font-size:11px;color:var(--soft)}
+.key .count{position:absolute;top:9px;right:10px;font-family:var(--mono);font-size:11px;color:var(--soft)}
+.key.done{background:#F7F9F5}
+@media (prefers-reduced-motion:reduce){.key,.pot,.cell.pop{transition:none;animation:none}}
+
+/* ---------- ledger ---------- */
+.entry{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--rule)}
+.entry:last-child{border-bottom:none}
+.entry .t{font-family:var(--mono);font-size:11.5px;color:var(--soft);width:52px;flex:none}
+.entry .n{flex:1;font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry .p{font-family:var(--mono);font-size:12px;color:var(--soft)}
+.entry .x{background:none;border:none;color:var(--soft);font-size:15px;padding:2px 5px;line-height:1;border-radius:5px}
+.entry .x:hover{color:var(--c1);background:rgba(217,30,99,.09)}
+.daygroup{margin-bottom:20px}
+.dayhead{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);padding-bottom:5px;border-bottom:1.5px solid var(--ink)}
+
+/* ---------- forms ---------- */
+.field{margin-bottom:16px}
+.label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--soft);margin-bottom:7px}
+.input{width:100%;background:var(--card);border:1.5px solid var(--ink);border-radius:9px;padding:12px 13px;font-size:16px}
+.input:focus{outline:2.5px solid var(--c0);outline-offset:1px}
+.num{width:78px;text-align:center;font-family:var(--mono)}
+.btn{background:var(--ink);color:var(--paper);border:2px solid var(--ink);border-radius:10px;padding:13px 18px;font-weight:600;font-size:15px;width:100%}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.small{width:auto;padding:9px 14px;font-size:13.5px;border-radius:8px}
+.btn:disabled{opacity:.4}
+
+.pickers{display:flex;flex-wrap:wrap;gap:8px}
+.pick{border:1.5px solid var(--ink);background:var(--card);border-radius:999px;padding:8px 14px;font-size:14px}
+.pick[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid var(--ink);border-radius:11px;overflow:hidden}
+.seg button{background:var(--card);border:none;padding:13px 10px;text-align:center;font-size:14.5px;font-weight:600}
+.seg button + button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg .sub{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.05em;font-weight:400;opacity:.7;margin-top:3px;text-transform:uppercase}
+
+.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--rule)}
+.row:last-of-type{border-bottom:none}
+.row .grow{flex:1;min-width:0}
+.rowname{width:100%;background:transparent;border:none;font-size:15px;font-weight:500;padding:2px 0}
+.rowname:focus{outline:none;border-bottom:1.5px solid var(--c0)}
+
+.card{background:var(--card);border:1.5px solid var(--rule);border-radius:13px;padding:16px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+.stat .v{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.03em}
+.stat .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.empty{padding:34px 14px;text-align:center;color:var(--soft);font-size:14.5px}
+
+.tabbar{position:sticky;top:0;z-index:20;display:flex;gap:6px;background:var(--paper);padding:10px 0 11px;margin-bottom:8px;border-bottom:1.5px solid var(--ink)}
+.tab{flex:1;background:none;border:none;padding:10px 8px;border-radius:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+.tab:hover{color:var(--ink);background:rgba(0,0,0,.05)}
+.tab[aria-current="true"],.tab[aria-current="true"]:hover{background:var(--ink);color:var(--paper)}
+
+.confirm{border:2px solid var(--ink);background:var(--card);border-radius:12px;padding:15px;margin-bottom:18px;box-shadow:3px 3px 0 var(--ink)}
+.cmsg{font-size:14.5px;margin-bottom:13px}
+.crow{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}
+.potedit{display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 16px;padding-left:2px}
+
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);background:var(--ink);color:var(--paper);padding:11px 17px;border-radius:999px;font-size:13.5px;opacity:0;pointer-events:none;transition:.2s;z-index:40;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+:focus-visible{outline:2.5px solid var(--c0);outline-offset:2px}
+h2{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.03em;margin:0 0 6px}
+h3{font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:-.015em;margin:0 0 10px}
+p{margin:0 0 14px}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="topbar"><div id="left" class="brand"><span></span>Tally</div><div id="whoslot"></div></div>
+  <main id="main"><div class="empty">Loading…</div></main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   Storage layout
+   personal  people          [{id,name}]
+   personal  current         personId
+   personal  pots:<personId> [{id,scope}]
+   personal  pot:<potId>     private pot config
+   personal  entries:<potId>:<personId>   private pot entries
+   shared    index           [{id,name}]
+   shared    pot:<potId>     shared pot config
+   shared    entries:<potId>:<personId>   shared pot entries
+   ========================================================= */
+
+var S = {
+  me: null,          // {id,name}
+  people: [],
+  mypots: [],        // [{id,scope}]
+  pots: {},          // potId -> config
+  entries: {},       // potId -> { personId: [entry] }
+  view: 'home',
+  potId: null,
+  offset: 0,
+  justAdded: null,
+  ready: false,
+  index: [],
+  confirm: null,
+  editHome: false,
+  missing: {}
+};
+var COLORS = ['--c0','--c1','--c2','--c3','--c4','--c5'];
+var PRESETS = ['Go to the gym','Read for 30 minutes','Meditate','Clean the house','Cook a meal','Sleep before 11pm','Walk outside','Stretch','No phone in bed','Journal','Call family','Practice an instrument'];
+
+/* =========================================================
+   SELF-HOSTING CONFIG — fill these two in and the app talks
+   to your own Supabase project instead of Claude's storage.
+   Leave them blank and it falls back to this-device-only.
+   ========================================================= */
+var SUPABASE_URL = 'https://snvcjyzcswbtdczvqkcy.supabase.co';   // e.g. 'https://abcdefgh.supabase.co'
+var SUPABASE_KEY = 'sb_publishable_u4cBQEqkljENYuKXmYWTmw_hEueFCnj';   // your project's anon / publishable key
+
+/* ---------- storage backends ---------- */
+var BACKEND = (typeof window.storage !== 'undefined' && window.storage) ? 'claude'
+            : (SUPABASE_URL && SUPABASE_KEY) ? 'supabase' : 'local';
+
+function localGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function localPut(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function myIdent(){
+  if(BACKEND==='claude') return null;
+  var v=localGet('tally-ident');
+  if(!v){ v='u'+Math.random().toString(36).slice(2,10); localPut('tally-ident',v); }
+  return v;
+}
+var IDENT = myIdent();
+function scopeName(shared){ return shared ? 'shared' : ('own:'+IDENT); }
+function lsKey(shared,key){ return 'tally|'+scopeName(shared)+'|'+key; }
+
+var IO = {
+  claude: {
+    get:  function(k,s){ return window.storage.get(k,s).then(function(r){ return r&&r.value?r.value:null; }); },
+    set:  function(k,v,s){ return window.storage.set(k,v,s).then(function(r){ return !!r; }); },
+    del:  function(k,s){ return window.storage.delete(k,s); },
+    list: function(p,s){ return window.storage.list(p,s).then(function(r){
+             return ((r&&r.keys)||[]).map(function(k){ return typeof k==='string'?k:(k.key||''); }).filter(Boolean); }); }
+  },
+  local: {
+    get:  function(k,s){ return Promise.resolve(localGet(lsKey(s,k))); },
+    set:  function(k,v,s){ localPut(lsKey(s,k),v); return Promise.resolve(true); },
+    del:  function(k,s){ try{ localStorage.removeItem(lsKey(s,k)); }catch(e){} return Promise.resolve(true); },
+    list: function(p,s){
+      var pre=lsKey(s,p||''), base=lsKey(s,'').length, out=[];
+      try{
+        for(var i=0;i<localStorage.length;i++){
+          var k=localStorage.key(i);
+          if(k && k.indexOf(pre)===0) out.push(k.slice(base));
+        }
+      }catch(e){}
+      return Promise.resolve(out);
+    }
+  },
+  supabase: {
+    head: function(extra){
+      var h={ apikey:SUPABASE_KEY, Authorization:'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json' };
+      if(extra) Object.keys(extra).forEach(function(k){ h[k]=extra[k]; });
+      return h;
+    },
+    q: function(k,s){
+      return '?key=eq.'+encodeURIComponent(k)+'&scope=eq.'+encodeURIComponent(scopeName(s));
+    },
+    get: function(k,s){
+      return fetch(SUPABASE_URL+'/rest/v1/kv?select=value&key=eq.'+encodeURIComponent(k)+
+                   '&scope=eq.'+encodeURIComponent(scopeName(s)), {headers:IO.supabase.head()})
+        .then(function(r){ return r.json(); })
+        .then(function(rows){ return (rows&&rows.length)?rows[0].value:null; });
+    },
+    set: function(k,v,s){
+      return fetch(SUPABASE_URL+'/rest/v1/kv', {
+        method:'POST',
+        headers: IO.supabase.head({Prefer:'resolution=merge-duplicates,return=minimal'}),
+        body: JSON.stringify({key:k, scope:scopeName(s), value:v})
+      }).then(function(r){ if(!r.ok) throw new Error('save failed'); return true; });
+    },
+    del: function(k,s){
+      return fetch(SUPABASE_URL+'/rest/v1/kv'+IO.supabase.q(k,s), {method:'DELETE', headers:IO.supabase.head()});
+    },
+    list: function(p,s){
+      return fetch(SUPABASE_URL+'/rest/v1/kv?select=key&scope=eq.'+encodeURIComponent(scopeName(s))+
+                   '&key=like.'+encodeURIComponent((p||'')+'*'), {headers:IO.supabase.head()})
+        .then(function(r){ return r.json(); })
+        .then(function(rows){ return (rows||[]).map(function(r){ return r.key; }); });
+    }
+  }
+};
+var BE = IO[BACKEND];
+
+function sget(key, shared){
+  return BE.get(key, !!shared).then(function(v){
+    if(v===null || v===undefined) return null;
+    try { return JSON.parse(v); } catch(e){ return null; }
+  }).catch(function(){ return null; });
+}
+function sset(key, val, shared){
+  return BE.set(key, JSON.stringify(val), !!shared).then(function(){ return true; })
+    .catch(function(){ toast('Could not save. Check your connection and try again.'); return false; });
+}
+function sdel(key, shared){ return BE.del(key, !!shared).catch(function(){ return null; }); }
+function slist(prefix, shared){ return BE.list(prefix||'', !!shared).catch(function(){ return []; }); }
+
+/* ---------- whole-account backup ---------- */
+function exportAll(){
+  return Promise.all([ slist('',false), slist('',true) ]).then(function(r){
+    var out={v:1, personal:{}, shared:{}}, jobs=[];
+    r[0].forEach(function(k){ jobs.push(sget(k,false).then(function(v){ if(v!==null) out.personal[k]=v; })); });
+    r[1].forEach(function(k){ jobs.push(sget(k,true ).then(function(v){ if(v!==null) out.shared[k]=v;  })); });
+    return Promise.all(jobs).then(function(){ return out; });
+  });
+}
+function importAll(obj){
+  var jobs=[];
+  Object.keys(obj.personal||{}).forEach(function(k){ jobs.push(sset(k,obj.personal[k],false)); });
+  Object.keys(obj.shared  ||{}).forEach(function(k){ jobs.push(sset(k,obj.shared[k],  true )); });
+  return Promise.all(jobs);
+}
+
+/* ---------- dates ---------- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function startOfWeek(d){ var x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return x; }
+function weekKeyOf(d){ var s=startOfWeek(d); return s.getFullYear()+'-'+pad(s.getMonth()+1)+'-'+pad(s.getDate()); }
+function weekStartForOffset(off){ var s=startOfWeek(new Date()); s.setDate(s.getDate()-7*off); return s; }
+function fmtRange(start){
+  var end=new Date(start); end.setDate(end.getDate()+6);
+  var o={month:'short',day:'numeric'};
+  return start.toLocaleDateString(undefined,o)+' – '+end.toLocaleDateString(undefined,o);
+}
+function fmtDay(ts){
+  var d=new Date(ts), t=new Date(); t.setHours(0,0,0,0);
+  var y=new Date(t); y.setDate(y.getDate()-1);
+  var dd=new Date(d); dd.setHours(0,0,0,0);
+  if(dd.getTime()===t.getTime()) return 'Today';
+  if(dd.getTime()===y.getTime()) return 'Yesterday';
+  return d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+}
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+
+/* ---------- misc ---------- */
+function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function initials(n){ var p=String(n).trim().split(/\s+/); return ((p[0]||'?')[0]+(p[1]?p[1][0]:'')).toUpperCase(); }
+function isShared(scope){ return scope === 'shared'; }
+function potScope(id){
+  for(var i=0;i<S.mypots.length;i++){ if(S.mypots[i].id===id) return S.mypots[i].scope; }
+  return 'shared';
+}
+function cur(){ return S.pots[S.potId]; }
+
+/* ---------- pot-scoped accessors ---------- */
+function memberOf(pot, pid){
+  var ms=(pot&&pot.members)||[];
+  for(var i=0;i<ms.length;i++){ if(ms[i].id===pid) return ms[i]; }
+  return {id:pid,name:'Someone',ci:0};
+}
+function colorVar(pot,pid){ return 'var('+COLORS[memberOf(pot,pid).ci % COLORS.length]+')'; }
+function habitIn(pot,id){
+  var hs=(pot&&pot.habits)||[];
+  for(var i=0;i<hs.length;i++){ if(hs[i].id===id) return hs[i]; }
+  return null;
+}
+function potEntries(potId){
+  var byP = S.entries[potId]||{}, out=[];
+  Object.keys(byP).forEach(function(p){ (byP[p]||[]).forEach(function(e){ out.push(e); }); });
+  return out.sort(function(a,b){ return a.ts-b.ts; });
+}
+function weekEntries(potId, off){
+  var s=weekStartForOffset(off).getTime(), e=s+7*24*3600*1000;
+  return potEntries(potId).filter(function(x){ return x.ts>=s && x.ts<e; });
+}
+function goalFor(pot, off){
+  var wk=weekKeyOf(weekStartForOffset(off));
+  var h=(pot&&pot.goalHistory)||[];
+  var g=h.length?h[0].goal:10;
+  for(var i=0;i<h.length;i++){ if(h[i].from<=wk) g=h[i].goal; }
+  return g;
+}
+function weekTotal(potId, off){
+  return weekEntries(potId,off).reduce(function(a,e){ return a+e.points; },0);
+}
+
+/* ---------- loading ---------- */
+function loadPot(id, scope){
+  var shared = isShared(scope);
+  return sget('pot:'+id, shared).then(function(cfg){
+    if(!cfg){ S.missing[id]=true; return null; }
+    delete S.missing[id];
+    S.pots[id]=cfg;
+    return loadEntries(id, scope).then(function(){ return cfg; });
+  });
+}
+function loadEntries(id, scope){
+  var shared = isShared(scope);
+  if(!shared){
+    return sget('entries:'+id+':'+S.me.id, false).then(function(v){
+      S.entries[id] = {}; S.entries[id][S.me.id] = v||[];
+    });
+  }
+  return slist('entries:'+id+':', true).then(function(keys){
+    var acc={};
+    return Promise.all(keys.map(function(k){
+      var pid = k.split(':')[2];
+      return sget(k, true).then(function(v){ acc[pid]=v||[]; });
+    })).then(function(){ S.entries[id]=acc; });
+  });
+}
+function loadAll(){
+  return Promise.all(S.mypots.map(function(p){ return loadPot(p.id, p.scope); }));
+}
+
+/* ---------- boot & migration ---------- */
+function boot(){
+  Promise.all([ sget('people',false), sget('current',false), sget('index',true) ]).then(function(r){
+    S.people = r[0]||[];
+    S.index = r[2]||[];
+    var currentId = r[1];
+    if(!S.people.length){
+      // maybe a v1 install
+      return migrateV1().then(function(done){
+        if(done) return finishBoot();
+        S.ready = true; render();
+      });
+    }
+    if(currentId){
+      S.people.forEach(function(p){ if(p.id===currentId) S.me=p; });
+    }
+    if(!S.me){ S.ready=true; render(); return; }
+    return finishBoot();
+  });
+}
+function finishBoot(){
+  return sget('pots:'+S.me.id, false).then(function(list){
+    S.mypots = list||[];
+    S.ready = true;
+    render();
+    return loadAll().then(function(){ render(); startPolling(); });
+  });
+}
+function migrateV1(){
+  return Promise.all([ sget('config',true), sget('me',false) ]).then(function(r){
+    var old = r[0], oldMe = r[1];
+    if(!old || !oldMe || typeof oldMe !== 'string') return false;
+    var name = 'Me';
+    (old.members||[]).forEach(function(m){ if(m.id===oldMe) name = m.name; });
+    S.me = {id: oldMe, name: name};
+    S.people = [S.me];
+    var potId = 'p-legacy';
+    return sget('pot:'+potId, true).then(function(existing){
+      var chain;
+      if(existing){
+        chain = Promise.resolve();
+      } else {
+        var cfg = {
+          id: potId, name: 'Our board', scope:'shared',
+          habits: old.habits||[], goalHistory: old.goalHistory||[{from:weekKeyOf(new Date()),goal:10}],
+          members: old.members||[], createdAt: Date.now()
+        };
+        chain = sset('pot:'+potId, cfg, true).then(function(){
+          return slist('log:', true).then(function(keys){
+            return Promise.all(keys.filter(function(k){ return k.split(':').length===2; }).map(function(k){
+              var pid = k.slice(4);
+              return sget(k,true).then(function(v){
+                if(!v || !v.length) return null;
+                return sset('entries:'+potId+':'+pid, v.map(function(e){
+                  return {id:e.id, habitId:e.habitId, name:e.name, points:e.points, ts:e.ts, by:e.by||pid};
+                }), true);
+              });
+            }));
+          });
+        }).then(function(){
+          return addToIndex(potId, 'Our board');
+        });
+      }
+      return chain.then(function(){
+        S.mypots = [{id:potId, scope:'shared'}];
+        return Promise.all([
+          sset('people', S.people, false),
+          sset('current', S.me.id, false),
+          sset('pots:'+S.me.id, S.mypots, false)
+        ]);
+      }).then(function(){ return true; });
+    });
+  });
+}
+function addToIndex(id,name){
+  return sget('index',true).then(function(ix){
+    ix = ix||[];
+    if(!ix.some(function(x){ return x.id===id; })) ix.push({id:id,name:name});
+    S.index = ix;
+    return sset('index', ix, true);
+  });
+}
+
+var pollTimer=null;
+function startPolling(){
+  if(pollTimer) return;
+  pollTimer = setInterval(function(){
+    if(document.visibilityState==='visible' && S.me) refresh();
+  }, 30000);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible' && S.me) refresh();
+  });
+}
+function refresh(){
+  if(S.view==='home'){
+    Promise.all([ loadAll(), sget('index',true).then(function(ix){ if(ix) S.index=ix; }) ]).then(render);
+    return;
+  }
+  if(S.potId){
+    var sc = potScope(S.potId);
+    Promise.all([ sget('pot:'+S.potId, isShared(sc)), loadEntries(S.potId, sc) ]).then(function(r){
+      if(r[0]) S.pots[S.potId]=r[0];
+      render();
+    });
+  }
+}
+
+/* ---------- actions ---------- */
+function tap(habitId){
+  var pot=cur(); if(!pot) return;
+  var h=habitIn(pot,habitId); if(!h) return;
+  var scope = potScope(pot.id), shared = isShared(scope);
+  var e={id:uid(), habitId:h.id, name:h.name, points:h.points, ts:Date.now(), by:S.me.id};
+  if(!S.entries[pot.id]) S.entries[pot.id]={};
+  var list=(S.entries[pot.id][S.me.id]||[]).slice();
+  list.push(e);
+  S.entries[pot.id][S.me.id]=list;
+  S.justAdded=e.id;
+  if(S.offset!==0) S.offset=0;
+  render();
+  if(navigator.vibrate){ try{ navigator.vibrate(12); }catch(err){} }
+  sset('entries:'+pot.id+':'+S.me.id, list, shared);
+}
+function removeEntry(id){
+  var pot=cur(); if(!pot) return;
+  var shared=isShared(potScope(pot.id));
+  var list=(S.entries[pot.id][S.me.id]||[]).filter(function(e){ return e.id!==id; });
+  S.entries[pot.id][S.me.id]=list;
+  render();
+  sset('entries:'+pot.id+':'+S.me.id, list, shared).then(function(ok){ if(ok) toast('Removed'); });
+}
+function savePot(pot){
+  return sset('pot:'+pot.id, pot, isShared(potScope(pot.id)));
+}
+function saveMyPots(){ return sset('pots:'+S.me.id, S.mypots, false); }
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t=setTimeout(function(){ t.classList.remove('show'); },2500);
+}
+function deleteSharedPot(id){
+  return slist('entries:'+id+':', true).then(function(keys){
+    return Promise.all(keys.map(function(k){ return sdel(k, true); }));
+  }).then(function(){ return sdel('pot:'+id, true); })
+   .then(function(){ return sget('index', true); })
+   .then(function(ix){
+     ix=(ix||[]).filter(function(x){ return x.id!==id; });
+     S.index=ix;
+     return sset('index', ix, true);
+   });
+}
+function removePot(id, everyone){
+  var shared = isShared(potScope(id));
+  S.mypots=S.mypots.filter(function(p){ return p.id!==id; });
+  delete S.pots[id]; delete S.entries[id]; delete S.missing[id];
+  var jobs=[ saveMyPots() ];
+  if(!shared){ jobs.push(sdel('pot:'+id,false), sdel('entries:'+id+':'+S.me.id,false)); }
+  else if(everyone){ jobs.push(deleteSharedPot(id)); }
+  return Promise.all(jobs).then(function(){
+    goHome();
+    toast(shared ? (everyone?'Pot deleted for everyone':'Left the pot') : 'Pot deleted');
+  });
+}
+function openPot(id){ S.potId=id; S.view='week'; S.offset=0; render(); refresh(); }
+function goHome(){ S.potId=null; S.view='home'; S.offset=0; render(); loadAll().then(render); }
+
+/* =========================================================
+   render
+   ========================================================= */
+function tabsHtml(){
+  var t=[['week','Week'],['log','Log'],['habits','Setup']];
+  return '<div class="tabbar">'+t.map(function(x){
+    return '<button class="tab" data-tab="'+x[0]+'" aria-current="'+(S.view===x[0]?'true':'false')+'">'+x[1]+'</button>';
+  }).join('')+'</div>';
+}
+function confirmBlock(){
+  if(!S.confirm) return '';
+  return '<div class="confirm"><div class="cmsg">'+esc(S.confirm.msg)+'</div><div class="crow">' +
+    '<button class="btn ghost small" id="cf-no">Cancel</button>' +
+    '<button class="btn small" id="cf-yes">'+esc(S.confirm.label)+'</button></div></div>';
+}
+function askConfirm(msg,label,fn){ S.confirm={msg:msg,label:label,fn:fn}; render(); try{ window.scrollTo(0,0); }catch(e){} }
+
+function render(){
+  var main=document.getElementById('main');
+  var left=document.getElementById('left'), whoslot=document.getElementById('whoslot');
+  if(!S.ready) return;
+
+  if(!S.me){
+    whoslot.innerHTML='';
+    left.className='brand'; left.innerHTML='<span></span>Tally';
+    main.innerHTML=viewWho(); wire(main); return;
+  }
+
+  whoslot.innerHTML='<button class="who" data-act="me"><span class="dot" style="background:var('+COLORS[0]+')"></span>'+esc(S.me.name)+'</button>';
+  whoslot.firstChild.onclick=function(){ S.view='me'; S.confirm=null; render(); };
+
+  if(S.view==='home' || S.view==='new' || S.view==='me'){
+    left.className='brand'; left.innerHTML='<span></span>Tally';
+    main.innerHTML = confirmBlock() + (S.view==='home' ? viewHome() : (S.view==='new' ? viewNew() : viewMe()));
+    wire(main); return;
+  }
+
+  var pot=cur();
+  if(!pot){ goHome(); return; }
+  left.className='';
+  left.innerHTML='<button class="back" data-act="back"><span class="arrow">‹</span><span class="pn">'+esc(pot.name)+'</span></button>';
+  left.firstChild.onclick=goHome;
+
+  main.innerHTML = tabsHtml() + confirmBlock() +
+    (S.view==='week' ? viewWeek() : S.view==='log' ? viewLog() : viewSetup());
+  wire(main);
+  S.justAdded=null;
+}
+
+/* ---------- who am I ---------- */
+function viewWho(){
+  return '<h2>Who are you?</h2>' +
+  '<p class="muted">Your name is how taps get recorded. Everyone using this app on their own device signs in once.</p>' +
+  (S.people.length ? '<div class="pickers" style="margin-bottom:20px">' + S.people.map(function(p){
+      return '<button class="pick" data-person="'+p.id+'">'+esc(p.name)+'</button>';
+    }).join('') + '</div><div class="rule"></div>' : '') +
+  '<div class="field"><label class="label" for="wh-name">'+(S.people.length?'Someone else':'Your name')+'</label>' +
+  '<div style="display:flex;gap:8px"><input class="input" id="wh-name" placeholder="e.g. Sam" autocomplete="given-name"><button class="btn small" id="wh-go">Continue</button></div></div>';
+}
+
+function viewMe(){
+  return '<h2>You</h2>' +
+  '<div class="field"><label class="label" for="me-name">Display name</label>' +
+  '<div style="display:flex;gap:8px"><input class="input" id="me-name" value="'+esc(S.me.name)+'"><button class="btn small" id="me-save">Save</button></div>' +
+  '<div class="muted" style="font-size:13px;margin-top:8px">Updates your name in every shared pot you\'ve joined.</div></div>' +
+  '<div class="rule"></div>' +
+  '<button class="btn ghost" id="me-switch">Switch person on this device</button>' +
+  '<div class="muted" style="font-size:13px;margin-top:10px">Useful if two of you share one phone. Each person keeps their own pots.</div>' +
+  '<div class="rule"></div>' +
+  '<div class="eyebrow" style="margin-bottom:8px">Where this is stored</div>' +
+  '<div class="card" style="margin-bottom:18px"><div style="font-size:14.5px">' +
+    (BACKEND==='claude' ? 'Claude artifact storage. Saving only works once the artifact is published.'
+     : BACKEND==='supabase' ? 'Your own Supabase project. Shared pots sync between everyone using this link.'
+     : 'This device only. No server is configured, so nothing syncs to your other devices or to anyone else.') +
+  '</div></div>' +
+  (BACKEND!=='claude' ?
+    '<div class="field"><label class="label" for="me-ident">Your private-data ID</label>' +
+    '<div style="display:flex;gap:8px"><input class="input" id="me-ident" value="'+esc(IDENT)+'"><button class="btn small" id="me-ident-save">Use</button></div>' +
+    '<div class="muted" style="font-size:13px;margin-top:8px">Your private pots are filed under this ID. Paste the same ID on another device to pick them up there.</div></div>' : '') +
+  '<div class="field"><span class="label">Backup</span>' +
+  '<textarea class="input" id="me-data" rows="3" placeholder="Your backup appears here. Paste one in to restore."></textarea>' +
+  '<div style="display:flex;gap:8px;margin-top:9px"><button class="btn small ghost" id="me-export">Make a backup</button>' +
+  '<button class="btn small ghost" id="me-import">Restore from paste</button></div>' +
+  '<div class="muted" style="font-size:13px;margin-top:8px">Copy the text somewhere safe. This is how you move everything to a self-hosted copy.</div></div>' +
+  '<div class="rule"></div>' +
+  '<button class="btn ghost" data-act="home">Back to pots</button>';
+}
+
+/* ---------- home ---------- */
+function viewHome(){
+  var html='<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">' +
+    '<h2 style="margin-bottom:6px">Your pots</h2>' +
+    (S.mypots.length ? '<button class="btn ghost small" data-act="edithome">'+(S.editHome?'Done':'Edit')+'</button>' : '') +
+  '</div>';
+  if(!S.mypots.length){
+    html += '<p class="muted">A pot is one set of habits with one weekly target. Keep a private one for yourself, share one with someone else, or both.</p>';
+  }
+  html += S.mypots.map(function(p){
+    var pot=S.pots[p.id];
+    if(!pot && S.missing[p.id]){
+      return '<div class="pot" style="box-shadow:none;border-style:dashed"><div class="ph">' +
+        '<span class="pname">Deleted pot</span></div>' +
+        '<div class="pmeta">Someone removed this pot. Nothing here any more.</div>' +
+        '<button class="btn ghost small" data-forget="'+p.id+'">Remove from my list</button></div>';
+    }
+    if(!pot) return '<div class="pot" style="box-shadow:none;border-style:dashed;opacity:.6"><div class="pmeta">Loading…</div></div>';
+    var total=weekTotal(p.id,0), goal=goalFor(pot,0);
+    var mini=miniStrip(p.id,goal);
+    var meta = isShared(p.scope)
+      ? '<span class="tag">'+((pot.members||[]).length)+' people</span> &nbsp;'+ (pot.members||[]).map(function(m){return esc(m.name);}).join(' &middot; ')
+      : '<span class="tag priv">Private</span> &nbsp;Only you can see this pot';
+    return '<button class="pot" data-open="'+p.id+'">' +
+      '<div class="ph"><span class="pname">'+esc(pot.name)+'</span>' +
+      '<span class="pscore">'+total+'<em> / '+goal+'</em></span></div>' +
+      '<div class="pmeta">'+meta+'</div>' + mini + '</button>' +
+      (S.editHome ? '<div class="potedit">' +
+        (isShared(p.scope)
+          ? '<button class="btn ghost small" data-leave-pot="'+p.id+'">Leave</button>' +
+            '<button class="btn ghost small" data-nuke-pot="'+p.id+'">Delete for everyone</button>'
+          : '<button class="btn ghost small" data-del-pot="'+p.id+'">Delete pot</button>') +
+      '</div>' : '');
+  }).join('');
+
+  html += '<button class="btn" data-act="new" style="margin-top:8px">New pot</button>';
+
+  var others = S.index.filter(function(x){
+    return !S.mypots.some(function(p){ return p.id===x.id; });
+  });
+  if(others.length){
+    html += '<div class="rule"></div><div class="eyebrow" style="margin-bottom:9px">Shared pots you can join</div>' +
+      others.map(function(x){
+        return '<div class="row"><span class="grow">'+esc(x.name)+'</span>' +
+        '<button class="btn ghost small" data-join="'+x.id+'">Join</button></div>';
+      }).join('') +
+      '<div class="muted" style="font-size:13px;margin-top:12px">Shared pots are visible to anyone who has the link to this app. Private pots never appear here.</div>';
+  }
+  return html;
+}
+function miniStrip(potId, goal){
+  var es=weekEntries(potId,0), cells=[];
+  es.forEach(function(e){ for(var i=0;i<e.points;i++) cells.push(e); });
+  var pot=S.pots[potId], n=Math.min(goal,40), out='<div class="mini">';
+  for(var i=0;i<n;i++){
+    if(i<cells.length) out += '<i class="f" style="background:'+colorVar(pot,cells[i].by)+'"></i>';
+    else out += '<i></i>';
+  }
+  return out+'</div>';
+}
+
+/* ---------- new pot ---------- */
+function viewNew(){
+  var copyable = S.mypots.filter(function(p){ return S.pots[p.id]; });
+  return '<h2>New pot</h2>' +
+  '<div class="field"><label class="label" for="np-name">Name it</label>' +
+  '<input class="input" id="np-name" placeholder="e.g. Us, or My week"></div>' +
+  '<div class="field"><span class="label">Who\'s in it</span>' +
+  '<div class="seg" id="np-scope">' +
+    '<button data-scope="private" aria-pressed="false">Just me<span class="sub">Private</span></button>' +
+    '<button data-scope="shared" aria-pressed="true">Shared<span class="sub">Anyone with the link</span></button>' +
+  '</div>' +
+  '<div class="muted" style="font-size:13px;margin-top:9px" id="np-note">A shared pot pools everyone\'s points into one weekly total.</div></div>' +
+  (copyable.length ? '<div class="field"><label class="label" for="np-copy">Start from an existing pot</label>' +
+    '<select class="input" id="np-copy"><option value="">Don\'t copy — choose below</option>' +
+    copyable.map(function(p){ return '<option value="'+p.id+'">'+esc(S.pots[p.id].name)+'</option>'; }).join('') +
+    '</select></div>' : '') +
+  '<div class="field"><span class="label">Habits</span><div class="pickers" id="np-presets">' +
+    PRESETS.map(function(p,i){ return '<button class="pick" data-preset="'+i+'" aria-pressed="'+(i<6)+'">'+esc(p)+'</button>'; }).join('') +
+  '</div></div>' +
+  '<div class="field"><label class="label" for="np-custom">Add your own</label>' +
+  '<div style="display:flex;gap:8px"><input class="input" id="np-custom" placeholder="Something else"><button class="btn small" id="np-add">Add</button></div>' +
+  '<div class="pickers" id="np-extra" style="margin-top:9px"></div></div>' +
+  '<div class="field"><label class="label" for="np-goal">Weekly points goal</label>' +
+  '<input class="input num" id="np-goal" type="number" min="1" max="200" value="10" inputmode="numeric"></div>' +
+  '<button class="btn" id="np-go">Create pot</button>' +
+  '<button class="btn ghost" data-act="home" style="margin-top:10px">Cancel</button>';
+}
+
+/* ---------- week ---------- */
+function viewWeek(){
+  var pot=cur(), start=weekStartForOffset(S.offset);
+  var es=weekEntries(pot.id,S.offset), goal=goalFor(pot,S.offset);
+  var total=es.reduce(function(a,e){return a+e.points;},0), met=total>=goal;
+
+  var html='<div class="weeknav">' +
+    '<button data-nav="-1" aria-label="Previous week">‹</button>' +
+    '<div class="weeklabel">'+(S.offset===0?'THIS WEEK':S.offset===1?'LAST WEEK':'WEEK OF')+' &middot; '+fmtRange(start).toUpperCase()+'</div>' +
+    '<button data-nav="1" aria-label="Next week"'+(S.offset===0?' disabled':'')+'>›</button></div>';
+
+  html+='<div class="scoreline"><div class="score">'+total+'</div><div class="goal">/ '+goal+'</div>'+(met?'<div class="metflag">Goal met</div>':'')+'</div>';
+  html+=tallyGrid(pot,es,goal);
+
+  if(isShared(potScope(pot.id))){
+    var by={}; es.forEach(function(e){ by[e.by]=(by[e.by]||0)+e.points; });
+    html+='<div class="split">'+(pot.members||[]).map(function(m){
+      return '<span class="chip"><span class="dot" style="background:var('+COLORS[m.ci%COLORS.length]+')"></span>'+esc(m.name)+' <strong style="font-weight:600">'+(by[m.id]||0)+'</strong></span>';
+    }).join('')+'</div>';
+  }
+
+  html+='<div class="rule"></div>';
+
+  var habits=(pot.habits||[]).filter(function(h){ return !h.archived; });
+  if(!habits.length){
+    html+='<div class="empty">No habits in this pot yet. Add some under Setup.</div>';
+  } else if(S.offset!==0){
+    html+='<div class="empty">You\'re looking at a past week. Come back to this week to log a habit.</div>';
+  } else {
+    var counts={}; es.forEach(function(e){ if(e.by===S.me.id) counts[e.habitId]=(counts[e.habitId]||0)+1; });
+    html+='<div class="eyebrow" style="margin-bottom:10px">Tap to log</div><div class="keys">'+habits.map(function(h){
+      var c=counts[h.id]||0;
+      return '<button class="key'+(c?' done':'')+'" data-habit="'+h.id+'">'+(c?'<span class="count">'+c+'&times;</span>':'')+
+        '<span class="name">'+esc(h.name)+'</span><span class="pts">+'+h.points+(h.points===1?' point':' points')+'</span></button>';
+    }).join('')+'</div>';
+  }
+
+  if(es.length){
+    html+='<div class="rule"></div><div class="eyebrow" style="margin-bottom:8px">Latest</div>';
+    html+=es.slice(-6).reverse().map(function(e){ return entryRow(pot,e); }).join('');
+    if(es.length>6) html+='<button class="btn ghost small" data-goto="log" style="margin-top:14px">See the full log</button>';
+  }
+  return html;
+}
+
+function tallyGrid(pot,es,goal){
+  var cells=[];
+  es.forEach(function(e){ for(var i=0;i<e.points;i++) cells.push(e); });
+  var size = goal<=12?42:goal<=24?32:goal<=40?25:19;
+  var out='<div class="tally" style="grid-template-columns:repeat(auto-fill,minmax('+size+'px,1fr))">';
+  var i,e,m;
+  for(i=0;i<Math.min(cells.length,goal);i++){
+    e=cells[i]; m=memberOf(pot,e.by);
+    out+='<div class="cell filled'+(e.id===S.justAdded&&i===cells.length-1?' pop':'')+'" style="background:var('+COLORS[m.ci%COLORS.length]+')" title="'+esc(m.name+' — '+e.name+' — '+fmtDay(e.ts)+' '+fmtTime(e.ts))+'">'+(size>=25?esc(initials(m.name)):'')+'</div>';
+  }
+  for(i=cells.length;i<goal;i++) out+='<div class="cell empty"></div>';
+  if(cells.length>goal){
+    out+='<div class="bonusrule"></div>';
+    for(i=goal;i<cells.length;i++){
+      e=cells[i]; m=memberOf(pot,e.by);
+      out+='<div class="cell bonus'+(e.id===S.justAdded&&i===cells.length-1?' pop':'')+'" style="background:var('+COLORS[m.ci%COLORS.length]+')" title="'+esc(m.name+' — '+e.name+' — bonus')+'">'+(size>=25?esc(initials(m.name)):'')+'</div>';
+    }
+  }
+  return out+'</div>';
+}
+
+function entryRow(pot,e){
+  var m=memberOf(pot,e.by);
+  return '<div class="entry"><span class="t">'+fmtTime(e.ts)+'</span>' +
+    '<span class="dot" style="background:var('+COLORS[m.ci%COLORS.length]+')"></span>' +
+    '<span class="n">'+esc(e.name)+'</span><span class="p">+'+e.points+'</span>' +
+    (e.by===S.me.id?'<button class="x" data-del="'+e.id+'" aria-label="Remove this entry">&times;</button>':'') + '</div>';
+}
+
+/* ---------- log ---------- */
+function viewLog(){
+  var pot=cur(), es=weekEntries(pot.id,S.offset), goal=goalFor(pot,S.offset);
+  var total=es.reduce(function(a,e){return a+e.points;},0), start=weekStartForOffset(S.offset);
+
+  var html='<div class="weeknav"><button data-nav="-1" aria-label="Previous week">‹</button>' +
+    '<div class="weeklabel">'+fmtRange(start).toUpperCase()+' &middot; '+total+'/'+goal+'</div>' +
+    '<button data-nav="1" aria-label="Next week"'+(S.offset===0?' disabled':'')+'>›</button></div>';
+
+  var st=stats(pot);
+  html+='<div class="card" style="margin-bottom:20px"><div class="stats">' +
+    '<div class="stat"><div class="v">'+st.total+'</div><div class="k">points all time</div></div>' +
+    '<div class="stat"><div class="v">'+st.weeksHit+'</div><div class="k">weeks hit</div></div>' +
+    '<div class="stat"><div class="v">'+st.streak+'</div><div class="k">week streak</div></div></div></div>';
+
+  if(es.length){
+    var per={};
+    es.forEach(function(e){ if(!per[e.name]) per[e.name]={n:0,p:0}; per[e.name].n++; per[e.name].p+=e.points; });
+    var names=Object.keys(per).sort(function(a,b){ return per[b].p-per[a].p; });
+    html+='<div class="eyebrow" style="margin-bottom:8px">By habit this week</div>' +
+      names.map(function(n){
+        return '<div class="entry"><span class="n">'+esc(n)+'</span><span class="p">'+per[n].n+'&times;</span>' +
+               '<span class="p" style="width:44px;text-align:right">+'+per[n].p+'</span></div>';
+      }).join('') + '<div class="rule"></div>';
+  } else {
+    return html + '<div class="empty">Nothing logged this week yet.</div>';
+  }
+
+  var days=[];
+  es.slice().reverse().forEach(function(e){
+    var k=fmtDay(e.ts);
+    var g=days.length&&days[days.length-1].k===k?days[days.length-1]:null;
+    if(!g){ g={k:k,items:[],p:0}; days.push(g); }
+    g.items.push(e); g.p+=e.points;
+  });
+  html+=days.map(function(g){
+    return '<div class="daygroup"><div class="dayhead">'+esc(g.k)+' &middot; +'+g.p+'</div>' +
+      g.items.map(function(e){ return entryRow(cur(),e); }).join('')+'</div>';
+  }).join('');
+  return html;
+}
+
+function stats(pot){
+  var all=potEntries(pot.id);
+  var total=all.reduce(function(a,e){return a+e.points;},0);
+  var byWeek={};
+  all.forEach(function(e){ var k=weekKeyOf(new Date(e.ts)); byWeek[k]=(byWeek[k]||0)+e.points; });
+  var hist=pot.goalHistory||[];
+  function goalAtKey(k){
+    var g=hist.length?hist[0].goal:10;
+    for(var i=0;i<hist.length;i++){ if(hist[i].from<=k) g=hist[i].goal; }
+    return g;
+  }
+  var weeksHit=0;
+  Object.keys(byWeek).forEach(function(k){ if(byWeek[k]>=goalAtKey(k)) weeksHit++; });
+  var streak=0, off=0, going=true;
+  while(going && off<260){
+    var k=weekKeyOf(weekStartForOffset(off));
+    if((byWeek[k]||0) >= goalFor(pot,off)){ streak++; off++; }
+    else if(off===0){ off++; }
+    else going=false;
+  }
+  return {total:total, weeksHit:weeksHit, streak:streak};
+}
+
+/* ---------- setup ---------- */
+function viewSetup(){
+  var pot=cur(), shared=isShared(potScope(pot.id));
+  var habits=pot.habits||[], goal=goalFor(pot,0);
+
+  var html='<h2>'+esc(pot.name)+'</h2>' +
+    '<div class="muted" style="font-size:13.5px;margin-bottom:18px">' +
+    (shared?'Shared pot — everyone with the link to this app can see it and join.':'Private pot — stored only on your account. Nobody else can see it.') +
+    '</div>';
+
+  html+='<div class="card" style="margin-bottom:22px"><h3>Weekly goal</h3>' +
+    '<div style="display:flex;align-items:center;gap:10px">' +
+    '<input class="input num" id="hb-goal" type="number" min="1" max="200" value="'+goal+'" inputmode="numeric">' +
+    '<button class="btn small" id="hb-goal-save">Update goal</button></div>' +
+    '<div class="muted" style="font-size:13px;margin-top:10px">Only affects this week onward — past weeks keep the goal they were set.</div></div>';
+
+  html+='<div class="eyebrow" style="margin-bottom:6px">Habits &middot; points each</div>';
+  var live=habits.filter(function(h){ return !h.archived; });
+  html+=live.map(function(h){
+    return '<div class="row"><span class="grow"><input class="rowname" value="'+esc(h.name)+'" data-rename="'+h.id+'" aria-label="Habit name"></span>' +
+      '<input class="input num" style="padding:7px" type="number" min="1" max="20" value="'+h.points+'" data-pts="'+h.id+'" inputmode="numeric" aria-label="Points">' +
+      '<button class="x" data-arch="'+h.id+'" aria-label="Retire habit" style="font-size:18px">&times;</button></div>';
+  }).join('');
+  if(!live.length) html+='<div class="empty">No habits yet. Add one below.</div>';
+
+  html+='<div class="field" style="margin-top:20px"><label class="label" for="hb-new">Add a habit</label>' +
+    '<div style="display:flex;gap:8px"><input class="input" id="hb-new" placeholder="e.g. Swim"><button class="btn small" id="hb-add">Add</button></div></div>';
+
+  var arch=habits.filter(function(h){ return h.archived; });
+  if(arch.length){
+    html+='<div class="rule"></div><div class="eyebrow" style="margin-bottom:6px">Retired</div>' +
+      arch.map(function(h){
+        return '<div class="row"><span class="grow muted">'+esc(h.name)+'</span><button class="btn ghost small" data-unarch="'+h.id+'">Bring back</button></div>';
+      }).join('') +
+      '<div class="muted" style="font-size:13px;margin-top:10px">Retiring keeps everything already logged for it.</div>';
+  }
+
+  html+='<div class="rule"></div>';
+  if(shared){
+    html+='<div class="eyebrow" style="margin-bottom:8px">In this pot</div>' +
+      (pot.members||[]).map(function(m){
+        return '<div class="row"><span class="dot" style="background:var('+COLORS[m.ci%COLORS.length]+')"></span>' +
+          '<span class="grow">'+esc(m.name)+(m.id===S.me.id?' <span class="muted">(you)</span>':'')+'</span></div>';
+      }).join('');
+  } else {
+    html+='<div class="eyebrow" style="margin-bottom:8px">Open it up</div>' +
+      '<button class="btn ghost" id="hb-share">Make this a shared pot</button>' +
+      '<div class="muted" style="font-size:13px;margin-top:10px">Moves this pot and its whole history into shared storage so others can join. It can\'t be made private again.</div>';
+  }
+
+  html+='<div class="rule"></div>' +
+    '<button class="btn ghost" id="hb-leave">'+(shared?'Leave this pot':'Delete this pot')+'</button>' +
+    '<div class="muted" style="font-size:13px;margin-top:10px">' +
+    (shared?'Removes it from your list. Everyone else keeps it, and your logged points stay in the pot.':'Deletes the pot and its history for good.')+'</div>' +
+    (shared ? '<button class="btn ghost" id="hb-nuke" style="margin-top:14px">Delete for everyone</button>' +
+      '<div class="muted" style="font-size:13px;margin-top:10px">Wipes the pot and its whole log for every person in it.</div>' : '');
+  return html;
+}
+
+/* =========================================================
+   wiring
+   ========================================================= */
+function wire(root){
+  root.querySelectorAll('[data-tab]').forEach(function(b){
+    b.onclick=function(){ S.view=b.dataset.tab; S.offset=0; S.confirm=null; render(); };
+  });
+  var cy=root.querySelector('#cf-yes');
+  if(cy){
+    cy.onclick=function(){ var f=S.confirm&&S.confirm.fn; S.confirm=null; render(); if(f) f(); };
+    root.querySelector('#cf-no').onclick=function(){ S.confirm=null; render(); };
+  }
+  root.querySelectorAll('[data-act=edithome]').forEach(function(b){
+    b.onclick=function(){ S.editHome=!S.editHome; render(); };
+  });
+  root.querySelectorAll('[data-forget]').forEach(function(b){
+    b.onclick=function(){
+      var id=b.dataset.forget;
+      S.mypots=S.mypots.filter(function(p){ return p.id!==id; });
+      delete S.missing[id];
+      saveMyPots().then(function(){ render(); });
+    };
+  });
+  root.querySelectorAll('[data-del-pot]').forEach(function(b){
+    b.onclick=function(){
+      var id=b.dataset.delPot, nm=(S.pots[id]||{}).name||'this pot';
+      askConfirm('Delete "'+nm+'" and its whole history? This cannot be undone.','Delete pot',function(){ removePot(id,false); });
+    };
+  });
+  root.querySelectorAll('[data-leave-pot]').forEach(function(b){
+    b.onclick=function(){
+      var id=b.dataset.leavePot, nm=(S.pots[id]||{}).name||'this pot';
+      askConfirm('Leave "'+nm+'"? It stays on the app for everyone else and you can rejoin later.','Leave pot',function(){ removePot(id,false); });
+    };
+  });
+  root.querySelectorAll('[data-nuke-pot]').forEach(function(b){
+    b.onclick=function(){
+      var id=b.dataset.nukePot, nm=(S.pots[id]||{}).name||'this pot';
+      askConfirm('Delete "'+nm+'" for everyone? The pot and its entire log go for good.','Delete for everyone',function(){ removePot(id,true); });
+    };
+  });
+  root.querySelectorAll('[data-act=home]').forEach(function(b){ b.onclick=function(){ S.confirm=null; S.editHome=false; goHome(); }; });
+  root.querySelectorAll('[data-act=new]').forEach(function(b){ b.onclick=function(){ S.view='new'; render(); }; });
+  root.querySelectorAll('[data-open]').forEach(function(b){ b.onclick=function(){ openPot(b.dataset.open); }; });
+  root.querySelectorAll('[data-habit]').forEach(function(b){ b.onclick=function(){ tap(b.dataset.habit); }; });
+  root.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ removeEntry(b.dataset.del); }; });
+  root.querySelectorAll('[data-nav]').forEach(function(b){
+    b.onclick=function(){ S.offset=Math.max(0,S.offset-(+b.dataset.nav)); render(); };
+  });
+  var gl=root.querySelector('[data-goto=log]'); if(gl) gl.onclick=function(){ S.view='log'; render(); };
+
+  /* who am I */
+  root.querySelectorAll('[data-person]').forEach(function(b){
+    b.onclick=function(){
+      S.people.forEach(function(p){ if(p.id===b.dataset.person) S.me=p; });
+      sset('current',S.me.id,false).then(function(){ S.mypots=[]; S.pots={}; S.entries={}; finishBoot(); });
+    };
+  });
+  var whGo=root.querySelector('#wh-go');
+  if(whGo){
+    var join=function(){
+      var v=root.querySelector('#wh-name').value.trim();
+      if(!v){ toast('Enter a name to continue.'); return; }
+      S.me={id:uid(), name:v};
+      S.people=S.people.concat([S.me]);
+      S.mypots=[]; S.pots={}; S.entries={};
+      Promise.all([ sset('people',S.people,false), sset('current',S.me.id,false), sset('pots:'+S.me.id,[],false) ])
+        .then(function(){ S.view='home'; S.ready=true; render(); startPolling(); });
+    };
+    whGo.onclick=join;
+    root.querySelector('#wh-name').onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); join(); } };
+  }
+  var meSave=root.querySelector('#me-save');
+  if(meSave){
+    meSave.onclick=function(){
+      var v=root.querySelector('#me-name').value.trim();
+      if(!v) return;
+      S.me.name=v;
+      S.people=S.people.map(function(p){ return p.id===S.me.id?S.me:p; });
+      var writes=[ sset('people',S.people,false) ];
+      S.mypots.forEach(function(p){
+        var pot=S.pots[p.id];
+        if(pot && isShared(p.scope)){
+          (pot.members||[]).forEach(function(m){ if(m.id===S.me.id) m.name=v; });
+          writes.push(savePot(pot));
+        }
+      });
+      Promise.all(writes).then(function(){ toast('Name updated'); S.view='home'; render(); });
+    };
+    var identSave=root.querySelector('#me-ident-save');
+    if(identSave) identSave.onclick=function(){
+      var v=root.querySelector('#me-ident').value.trim();
+      if(!v) return;
+      localPut('tally-ident', v);
+      location.reload();
+    };
+    root.querySelector('#me-export').onclick=function(){
+      exportAll().then(function(data){
+        var box=root.querySelector('#me-data');
+        box.value=JSON.stringify(data);
+        box.focus(); box.select();
+        toast('Backup ready — copy the text');
+      });
+    };
+    root.querySelector('#me-import').onclick=function(){
+      var raw=root.querySelector('#me-data').value.trim();
+      if(!raw){ toast('Paste a backup in first.'); return; }
+      var obj;
+      try { obj=JSON.parse(raw); } catch(e){ toast('That doesn\'t look like a backup.'); return; }
+      if(!obj || (!obj.personal && !obj.shared)){ toast('That doesn\'t look like a backup.'); return; }
+      askConfirm('Restore this backup? It overwrites anything already saved under the same names.','Restore',function(){
+        importAll(obj).then(function(){
+          toast('Restored');
+          S.me=null; S.people=[]; S.mypots=[]; S.pots={}; S.entries={}; S.missing={};
+          boot();
+        });
+      });
+    };
+    root.querySelector('#me-switch').onclick=function(){
+      S.me=null; S.mypots=[]; S.pots={}; S.entries={};
+      sdel('current',false).then(function(){ render(); });
+    };
+  }
+
+  /* join a shared pot */
+  root.querySelectorAll('[data-join]').forEach(function(b){
+    b.onclick=function(){
+      var id=b.dataset.join;
+      b.disabled=true;
+      sget('pot:'+id,true).then(function(pot){
+        if(!pot){ toast('That pot has gone missing.'); return; }
+        var ms=pot.members||[];
+        if(!ms.some(function(m){ return m.id===S.me.id; })){
+          ms.push({id:S.me.id,name:S.me.name,ci:ms.length});
+          pot.members=ms;
+        }
+        S.pots[id]=pot;
+        S.mypots=S.mypots.concat([{id:id,scope:'shared'}]);
+        return Promise.all([ sset('pot:'+id,pot,true), saveMyPots() ]).then(function(){
+          return loadEntries(id,'shared');
+        }).then(function(){ toast('Joined '+pot.name); render(); });
+      });
+    };
+  });
+
+  /* new pot */
+  var npGo=root.querySelector('#np-go');
+  if(npGo){
+    var extra=[];
+    var scopeBox=root.querySelector('#np-scope');
+    scopeBox.onclick=function(ev){
+      var b=ev.target.closest('[data-scope]'); if(!b) return;
+      Array.prototype.forEach.call(scopeBox.children,function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
+      root.querySelector('#np-note').textContent = b.dataset.scope==='private'
+        ? 'A private pot is stored on your account only. Nobody else can see it or add to it.'
+        : 'A shared pot pools everyone\'s points into one weekly total.';
+    };
+    var pres=root.querySelector('#np-presets');
+    pres.onclick=function(ev){
+      var b=ev.target.closest('[data-preset]'); if(!b) return;
+      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed')==='true'?'false':'true');
+    };
+    var copySel=root.querySelector('#np-copy');
+    if(copySel){
+      copySel.onchange=function(){
+        var src=S.pots[copySel.value];
+        if(!src) return;
+        var names={};
+        (src.habits||[]).filter(function(h){return !h.archived;}).forEach(function(h){ names[h.name]=h.points; });
+        Array.prototype.forEach.call(pres.querySelectorAll('[data-preset]'),function(b){
+          b.setAttribute('aria-pressed', names[PRESETS[+b.dataset.preset]]?'true':'false');
+        });
+        extra = Object.keys(names).filter(function(n){ return PRESETS.indexOf(n)===-1; });
+        paintExtra();
+        root.querySelector('#np-goal').value = goalFor(src,0);
+      };
+    }
+    function paintExtra(){
+      root.querySelector('#np-extra').innerHTML = extra.map(function(x){
+        return '<button class="pick" aria-pressed="true" disabled>'+esc(x)+'</button>';
+      }).join('');
+    }
+    var addCustom=function(){
+      var inp=root.querySelector('#np-custom'), v=inp.value.trim();
+      if(!v) return;
+      extra.push(v); inp.value=''; paintExtra(); inp.focus();
+    };
+    root.querySelector('#np-add').onclick=addCustom;
+    root.querySelector('#np-custom').onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); addCustom(); } };
+
+    npGo.onclick=function(){
+      var name=root.querySelector('#np-name').value.trim();
+      if(!name){ toast('Give the pot a name.'); root.querySelector('#np-name').focus(); return; }
+      var scope='shared';
+      Array.prototype.forEach.call(scopeBox.children,function(x){ if(x.getAttribute('aria-pressed')==='true') scope=x.dataset.scope; });
+      var goal=Math.max(1,parseInt(root.querySelector('#np-goal').value,10)||10);
+      var chosen=[];
+      Array.prototype.forEach.call(pres.querySelectorAll('[data-preset]'),function(b){
+        if(b.getAttribute('aria-pressed')==='true') chosen.push(PRESETS[+b.dataset.preset]);
+      });
+      chosen=chosen.concat(extra);
+      if(!chosen.length){ toast('Pick at least one habit.'); return; }
+      npGo.disabled=true;
+      var id='p'+uid();
+      var pot={
+        id:id, name:name, scope:scope,
+        habits: chosen.map(function(n){ return {id:uid(), name:n, points:1}; }),
+        goalHistory:[{from:weekKeyOf(new Date()), goal:goal}],
+        members:[{id:S.me.id, name:S.me.name, ci:0}],
+        createdAt: Date.now()
+      };
+      S.pots[id]=pot;
+      S.entries[id]={}; S.entries[id][S.me.id]=[];
+      S.mypots=S.mypots.concat([{id:id,scope:scope}]);
+      var jobs=[ sset('pot:'+id,pot,isShared(scope)), saveMyPots() ];
+      if(isShared(scope)) jobs.push(addToIndex(id,name));
+      Promise.all(jobs).then(function(){ openPot(id); });
+    };
+  }
+
+  /* setup */
+  var hbAdd=root.querySelector('#hb-add');
+  if(hbAdd){
+    var pot=cur();
+    var add=function(){
+      var inp=root.querySelector('#hb-new'), v=inp.value.trim();
+      if(!v) return;
+      pot.habits=(pot.habits||[]).concat([{id:uid(),name:v,points:1}]);
+      inp.value='';
+      savePot(pot).then(function(){ render(); toast('Added'); });
+    };
+    hbAdd.onclick=add;
+    root.querySelector('#hb-new').onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); add(); } };
+
+    root.querySelector('#hb-goal-save').onclick=function(){
+      var g=Math.max(1,parseInt(root.querySelector('#hb-goal').value,10)||1);
+      var wk=weekKeyOf(new Date());
+      var hist=(pot.goalHistory||[]).filter(function(h){ return h.from!==wk; });
+      hist.push({from:wk,goal:g});
+      hist.sort(function(a,b){ return a.from<b.from?-1:1; });
+      pot.goalHistory=hist;
+      savePot(pot).then(function(){ toast('Weekly goal is now '+g); render(); });
+    };
+    root.querySelectorAll('[data-rename]').forEach(function(inp){
+      inp.onchange=function(){
+        var h=habitIn(pot,inp.dataset.rename); if(!h) return;
+        var v=inp.value.trim(); if(!v){ inp.value=h.name; return; }
+        h.name=v; savePot(pot).then(function(){ toast('Renamed'); });
+      };
+    });
+    root.querySelectorAll('[data-pts]').forEach(function(inp){
+      inp.onchange=function(){
+        var h=habitIn(pot,inp.dataset.pts); if(!h) return;
+        h.points=Math.max(1,parseInt(inp.value,10)||1); inp.value=h.points;
+        savePot(pot).then(function(){ toast(h.name+' is now worth '+h.points); });
+      };
+    });
+    root.querySelectorAll('[data-arch]').forEach(function(b){
+      b.onclick=function(){
+        var h=habitIn(pot,b.dataset.arch); if(!h) return;
+        h.archived=true; savePot(pot).then(function(){ render(); toast(h.name+' retired'); });
+      };
+    });
+    root.querySelectorAll('[data-unarch]').forEach(function(b){
+      b.onclick=function(){
+        var h=habitIn(pot,b.dataset.unarch); if(!h) return;
+        h.archived=false; savePot(pot).then(render);
+      };
+    });
+
+    var shareBtn=root.querySelector('#hb-share');
+    if(shareBtn){
+      shareBtn.onclick=function(){
+        askConfirm('Make "'+pot.name+'" shared? Anyone with the link to this app will be able to see it and join. This can\'t be undone.','Make it shared',doShare);
+      };
+      function doShare(){
+        var mine=(S.entries[pot.id]||{})[S.me.id]||[];
+        pot.scope='shared';
+        S.mypots=S.mypots.map(function(p){ return p.id===pot.id?{id:p.id,scope:'shared'}:p; });
+        Promise.all([
+          sset('pot:'+pot.id,pot,true),
+          sset('entries:'+pot.id+':'+S.me.id, mine, true),
+          addToIndex(pot.id,pot.name),
+          saveMyPots()
+        ]).then(function(){
+          return Promise.all([ sdel('pot:'+pot.id,false), sdel('entries:'+pot.id+':'+S.me.id,false) ]);
+        }).then(function(){ toast(pot.name+' is now shared'); render(); });
+      }
+    }
+
+    root.querySelector('#hb-leave').onclick=function(){
+      var sh=isShared(potScope(pot.id));
+      askConfirm(sh
+        ? 'Leave "'+pot.name+'"? It stays on the app for everyone else, and you can rejoin later.'
+        : 'Delete "'+pot.name+'" and its whole history? This cannot be undone.',
+        sh?'Leave pot':'Delete pot',
+        function(){ removePot(pot.id,false); });
+    };
+    var nuke=root.querySelector('#hb-nuke');
+    if(nuke) nuke.onclick=function(){
+      askConfirm('Delete "'+pot.name+'" for everyone? The pot and its entire log go for good.','Delete for everyone',
+        function(){ removePot(pot.id,true); });
+    };
+  }
+}
+
+
+boot();
+})();
+</script>
+</body>
+</html>
