@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tally — habit pots</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Tally">
 <meta name="theme-color" content="#EDEFEA">
@@ -36,7 +39,11 @@ body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:
 button{font:inherit;color:inherit;cursor:pointer}
 input,select{font:inherit;color:inherit}
 
-#app{max-width:560px;margin:0 auto;padding:0 18px 56px;min-height:100vh}
+#app{max-width:560px;margin:0 auto;min-height:100vh;
+  padding:env(safe-area-inset-top) 18px calc(56px + env(safe-area-inset-bottom))}
+body{overscroll-behavior-y:none}
+button,.tab,.cell,.eyebrow,.label,.dayhead{-webkit-user-select:none;user-select:none}
+button{touch-action:manipulation}
 @media (min-width:500px){.keys{grid-template-columns:repeat(3,1fr)}}
 
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 14px;min-height:62px}
@@ -102,6 +109,10 @@ input,select{font:inherit;color:inherit}
 .bonusrule{grid-column:1/-1;height:1px;background:var(--gold);margin:5px 0 1px;opacity:.6}
 
 .split{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+.ava{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;
+  font-family:var(--mono);font-weight:500;flex:none;line-height:1}
+.swatch{width:34px;height:34px;border-radius:50%;border:2px solid transparent;padding:0;flex:none}
+.swatch[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--paper) inset}
 .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;border:1px solid var(--rule);background:var(--card);border-radius:999px;padding:4px 10px}
 
 /* ---------- habit keys ---------- */
@@ -216,7 +227,8 @@ var S = {
   index: [],
   confirm: null,
   editHome: false,
-  missing: {}
+  missing: {},
+  avatars: {}
 };
 var COLORS = ['--c0','--c1','--c2','--c3','--c4','--c5'];
 var PRESETS = ['Go to the gym','Read for 30 minutes','Meditate','Clean the house','Cook a meal','Sleep before 11pm','Walk outside','Stretch','No phone in bed','Journal','Call family','Practice an instrument'];
@@ -226,8 +238,8 @@ var PRESETS = ['Go to the gym','Read for 30 minutes','Meditate','Clean the house
    to your own Supabase project instead of Claude's storage.
    Leave them blank and it falls back to this-device-only.
    ========================================================= */
-var SUPABASE_URL = 'https://snvcjyzcswbtdczvqkcy.supabase.co';   // e.g. 'https://abcdefgh.supabase.co'
-var SUPABASE_KEY = 'sb_publishable_u4cBQEqkljENYuKXmYWTmw_hEueFCnj';   // your project's anon / publishable key
+var SUPABASE_URL = '';   // e.g. 'https://abcdefgh.supabase.co'
+var SUPABASE_KEY = '';   // your project's anon / publishable key
 
 /* ---------- storage backends ---------- */
 var BACKEND = (typeof window.storage !== 'undefined' && window.storage) ? 'claude'
@@ -303,18 +315,137 @@ var IO = {
 };
 var BE = IO[BACKEND];
 
+/* A local mirror of everything read or written, so the app still opens
+   and shows your week with no connection. */
+function mkey(key,shared){ return 'cache|'+scopeName(shared)+'|'+key; }
+function mirror(key,raw,shared){ localPut(mkey(key,shared), raw); }
+function unmirror(key,shared){ try{ localStorage.removeItem(mkey(key,shared)); }catch(e){} }
+function mirrorList(prefix,shared){
+  var pre=mkey(prefix||'',shared), base=mkey('',shared).length, out=[];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(k && k.indexOf(pre)===0) out.push(k.slice(base));
+    }
+  }catch(e){}
+  return out;
+}
+
+/* Writes that fail get held and retried. One slot per key: the value is
+   always that key's complete current state, so the newest wins safely. */
+function queueWrite(key,raw,shared){
+  try{
+    var q=JSON.parse(localGet('tally-queue')||'{}');
+    q[scopeName(shared)+'|'+key]={k:key,v:raw,s:!!shared};
+    localPut('tally-queue',JSON.stringify(q));
+  }catch(e){}
+}
+function pendingCount(){
+  try{ return Object.keys(JSON.parse(localGet('tally-queue')||'{}')).length; }catch(e){ return 0; }
+}
+function flushQueue(){
+  var q;
+  try{ q=JSON.parse(localGet('tally-queue')||'{}'); }catch(e){ return Promise.resolve(); }
+  var ids=Object.keys(q);
+  if(!ids.length) return Promise.resolve();
+  return Promise.all(ids.map(function(id){
+    var it=q[id];
+    return BE.set(it.k,it.v,it.s).then(function(){ delete q[id]; }).catch(function(){});
+  })).then(function(){
+    localPut('tally-queue',JSON.stringify(q));
+    if(!Object.keys(q).length) toast('Back online — everything synced');
+  });
+}
+
 function sget(key, shared){
   return BE.get(key, !!shared).then(function(v){
     if(v===null || v===undefined) return null;
+    mirror(key, v, !!shared);
     try { return JSON.parse(v); } catch(e){ return null; }
-  }).catch(function(){ return null; });
+  }).catch(function(){
+    var m=readMirrorValue(key, !!shared);
+    if(m===null) return null;
+    try { return JSON.parse(m); } catch(e){ return null; }
+  });
 }
+function readMirrorValue(key,shared){ return localGet(mkey(key,shared)); }
 function sset(key, val, shared){
-  return BE.set(key, JSON.stringify(val), !!shared).then(function(){ return true; })
-    .catch(function(){ toast('Could not save. Check your connection and try again.'); return false; });
+  var raw=JSON.stringify(val);
+  mirror(key, raw, !!shared);
+  return BE.set(key, raw, !!shared).then(function(){ return true; })
+    .catch(function(){
+      queueWrite(key, raw, !!shared);
+      toast('Saved on this device — it\'ll sync when you\'re back online');
+      return false;
+    });
 }
-function sdel(key, shared){ return BE.del(key, !!shared).catch(function(){ return null; }); }
-function slist(prefix, shared){ return BE.list(prefix||'', !!shared).catch(function(){ return []; }); }
+function sdel(key, shared){ unmirror(key,!!shared); return BE.del(key, !!shared).catch(function(){ return null; }); }
+function slist(prefix, shared){
+  return BE.list(prefix||'', !!shared).catch(function(){ return mirrorList(prefix||'', !!shared); });
+}
+
+/* ---------- avatars ---------- */
+function avatarKey(pid){ return 'avatar:'+pid; }
+function loadAvatars(ids){
+  var want=ids.filter(function(id){ return !(id in S.avatars); });
+  if(!want.length) return Promise.resolve();
+  return Promise.all(want.map(function(id){
+    return sget(avatarKey(id), true).then(function(v){ S.avatars[id]= v || null; });
+  }));
+}
+function avatarHtml(pid, name, ci, size){
+  size = size || 22;
+  var src=S.avatars[pid];
+  if(src){
+    return '<img src="'+src+'" alt="" ' +
+      'style="width:'+size+'px;height:'+size+'px;border-radius:50%;object-fit:cover;flex:none;' +
+      'border:1.5px solid var('+COLORS[(ci||0)%COLORS.length]+')">';
+  }
+  return '<span class="ava" style="width:'+size+'px;height:'+size+'px;background:var('+COLORS[(ci||0)%COLORS.length]+');' +
+    'font-size:'+Math.round(size*0.42)+'px">'+esc(initials(name||'?'))+'</span>';
+}
+
+/* Photos are stored as text, so they get shrunk hard: a square thumbnail,
+   JPEG, typically 4-6 KB. */
+function shrinkImage(file, size){
+  return new Promise(function(resolve, reject){
+    var reader=new FileReader();
+    reader.onerror=function(){ reject(new Error('read failed')); };
+    reader.onload=function(){
+      var img=new Image();
+      img.onerror=function(){ reject(new Error('decode failed')); };
+      img.onload=function(){
+        try{
+          var side=Math.min(img.width, img.height);
+          var sx=(img.width-side)/2, sy=(img.height-side)/2;
+          var c=document.createElement('canvas');
+          c.width=size; c.height=size;
+          var ctx=c.getContext('2d');
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+          resolve(c.toDataURL('image/jpeg', 0.72));
+        }catch(err){ reject(err); }
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---------- pot passkeys ----------
+   A latch, not a lock: it keeps people from wandering into a pot that
+   isn't theirs. It is not encryption, and the UI says so. */
+function hashKey(str){
+  var h=0x811c9dc5;
+  for(var pass=0; pass<3; pass++){
+    for(var i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = (h + ((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24))) >>> 0;
+    }
+    h = (h ^ (h>>>13)) >>> 0;
+  }
+  return ('00000000'+h.toString(16)).slice(-8);
+}
+function potLocked(pot){ return !!(pot && pot.lock); }
 
 /* ---------- whole-account backup ---------- */
 function exportAll(){
@@ -367,9 +498,26 @@ function cur(){ return S.pots[S.potId]; }
 function memberOf(pot, pid){
   var ms=(pot&&pot.members)||[];
   for(var i=0;i<ms.length;i++){ if(ms[i].id===pid) return ms[i]; }
-  return {id:pid,name:'Someone',ci:0};
+  var es=potEntries(pot?pot.id:'');
+  for(var j=es.length-1;j>=0;j--){
+    if(es[j].by===pid && es[j].byName) return {id:pid, name:es[j].byName, ci:es[j].byCi||0};
+  }
+  return {id:pid,name:'Someone else',ci:0};
 }
 function colorVar(pot,pid){ return 'var('+COLORS[memberOf(pot,pid).ci % COLORS.length]+')'; }
+function contributors(pot){
+  var seen={}, out=[];
+  (pot.members||[]).forEach(function(m){
+    if(seen[m.id]) return;
+    seen[m.id]=1; out.push({id:m.id, name:m.name, ci:m.ci||0});
+  });
+  potEntries(pot.id).forEach(function(e){
+    if(seen[e.by]) return;
+    seen[e.by]=1;
+    out.push({id:e.by, name:(e.byName||'Someone else'), ci:(e.byCi||0)});
+  });
+  return out;
+}
 function habitIn(pot,id){
   var hs=(pot&&pot.habits)||[];
   for(var i=0;i<hs.length;i++){ if(hs[i].id===id) return hs[i]; }
@@ -527,6 +675,7 @@ function refresh(){
     Promise.all([ sget('pot:'+S.potId, isShared(sc)), loadEntries(S.potId, sc) ]).then(function(r){
       if(r[0]) S.pots[S.potId]=r[0];
       render();
+      return syncAvatars();
     });
   }
 }
@@ -536,7 +685,9 @@ function tap(habitId){
   var pot=cur(); if(!pot) return;
   var h=habitIn(pot,habitId); if(!h) return;
   var scope = potScope(pot.id), shared = isShared(scope);
-  var e={id:uid(), habitId:h.id, name:h.name, points:h.points, ts:Date.now(), by:S.me.id};
+  var e={id:uid(), habitId:h.id, name:h.name, points:h.points, ts:Date.now(),
+         by:S.me.id, byName:S.me.name, byCi:S.me.ci||0};
+  ensureMembership(pot);
   if(!S.entries[pot.id]) S.entries[pot.id]={};
   var list=(S.entries[pot.id][S.me.id]||[]).slice();
   list.push(e);
@@ -546,6 +697,21 @@ function tap(habitId){
   render();
   if(navigator.vibrate){ try{ navigator.vibrate(12); }catch(err){} }
   sset('entries:'+pot.id+':'+S.me.id, list, shared);
+}
+/* If we're logging into a shared pot we're somehow not listed in, put
+   ourselves back. Re-reads first so a concurrent join isn't clobbered. */
+function ensureMembership(pot){
+  if(!isShared(potScope(pot.id))) return;
+  var listed=(pot.members||[]).some(function(m){ return m.id===S.me.id; });
+  if(listed) return;
+  sget('pot:'+pot.id, true).then(function(fresh){
+    if(!fresh) return;
+    var ms=fresh.members||[];
+    if(ms.some(function(m){ return m.id===S.me.id; })) { S.pots[pot.id]=fresh; return; }
+    ms.push({id:S.me.id, name:S.me.name, ci:S.me.ci||0});
+    fresh.members=ms; S.pots[pot.id]=fresh;
+    return sset('pot:'+pot.id, fresh, true).then(function(){ render(); });
+  });
 }
 function removeEntry(id){
   var pot=cur(); if(!pot) return;
@@ -588,7 +754,12 @@ function removePot(id, everyone){
     toast(shared ? (everyone?'Pot deleted for everyone':'Left the pot') : 'Pot deleted');
   });
 }
-function openPot(id){ S.potId=id; S.view='week'; S.offset=0; render(); refresh(); }
+function openPot(id){ S.potId=id; S.view='week'; S.offset=0; render(); refresh(); syncAvatars(); }
+function syncAvatars(){
+  var pot=cur(); if(!pot) return Promise.resolve();
+  if(!isShared(potScope(pot.id))) return Promise.resolve();
+  return loadAvatars(contributors(pot).map(function(m){ return m.id; })).then(render);
+}
 function goHome(){ S.potId=null; S.view='home'; S.offset=0; render(); loadAll().then(render); }
 
 /* =========================================================
@@ -602,11 +773,20 @@ function tabsHtml(){
 }
 function confirmBlock(){
   if(!S.confirm) return '';
-  return '<div class="confirm"><div class="cmsg">'+esc(S.confirm.msg)+'</div><div class="crow">' +
-    '<button class="btn ghost small" id="cf-no">Cancel</button>' +
-    '<button class="btn small" id="cf-yes">'+esc(S.confirm.label)+'</button></div></div>';
+  var opts=S.confirm.options||[];
+  return '<div class="confirm"><div class="cmsg">'+esc(S.confirm.msg)+'</div>' +
+    (S.confirm.field ? '<input class="input" id="cf-field" type="'+(S.confirm.password?'password':'text')+'" placeholder="'+esc(S.confirm.field)+'" style="margin-bottom:12px">' : '') +
+    '<div class="crow"><button class="btn ghost small" id="cf-no">Cancel</button>' +
+    opts.map(function(o,i){ return '<button class="btn small" data-cf="'+i+'">'+esc(o.label)+'</button>'; }).join('') +
+    '</div></div>';
 }
-function askConfirm(msg,label,fn){ S.confirm={msg:msg,label:label,fn:fn}; render(); try{ window.scrollTo(0,0); }catch(e){} }
+function askConfirm(msg,label,fn){ askChoice(msg,[{label:label,fn:fn}]); }
+function askChoice(msg, options, opts){
+  opts = opts || {};
+  S.confirm={msg:msg, options:options, field:opts.field, password:opts.password};
+  render();
+  try{ window.scrollTo(0,0); }catch(e){}
+}
 
 function render(){
   var main=document.getElementById('main');
@@ -652,13 +832,26 @@ function viewWho(){
 }
 
 function viewMe(){
+  var myCi=S.me.ci||0;
   return '<h2>You</h2>' +
+  '<div class="field" style="display:flex;align-items:center;gap:14px">' +
+    avatarHtml(S.me.id, S.me.name, myCi, 60) +
+    '<div style="flex:1;min-width:0">' +
+      '<label class="btn ghost small" for="me-photo" style="display:inline-block;cursor:pointer">'+(S.avatars[S.me.id]?'Change photo':'Add a photo')+'</label>' +
+      '<input type="file" id="me-photo" accept="image/*" style="display:none">' +
+      (S.avatars[S.me.id]?' <button class="btn ghost small" id="me-photo-clear">Remove</button>':'') +
+      '<div class="muted" style="font-size:13px;margin-top:8px">Shrunk to a thumbnail and shared with everyone in your pots.</div>' +
+    '</div>' +
+  '</div>' +
   '<div class="field"><label class="label" for="me-name">Display name</label>' +
-  '<div style="display:flex;gap:8px"><input class="input" id="me-name" value="'+esc(S.me.name)+'"><button class="btn small" id="me-save">Save</button></div>' +
-  '<div class="muted" style="font-size:13px;margin-top:8px">Updates your name in every shared pot you\'ve joined.</div></div>' +
-  '<div class="rule"></div>' +
-  '<button class="btn ghost" id="me-switch">Switch person on this device</button>' +
-  '<div class="muted" style="font-size:13px;margin-top:10px">Useful if two of you share one phone. Each person keeps their own pots.</div>' +
+  '<div style="display:flex;gap:8px"><input class="input" id="me-name" value="'+esc(S.me.name)+'"><button class="btn small" id="me-save">Save</button></div></div>' +
+  '<div class="field"><span class="label">Your colour</span>' +
+  '<div class="pickers" id="me-colours">' +
+    COLORS.map(function(c,i){
+      return '<button class="swatch" data-ci="'+i+'" aria-pressed="'+(i===myCi)+'" aria-label="Colour '+(i+1)+'" style="background:var('+c+')"></button>';
+    }).join('') +
+  '</div>' +
+  '<div class="muted" style="font-size:13px;margin-top:9px">Used for your tally squares and your name everywhere.</div></div>' +
   '<div class="rule"></div>' +
   '<div class="eyebrow" style="margin-bottom:8px">Where this is stored</div>' +
   '<div class="card" style="margin-bottom:18px"><div style="font-size:14.5px">' +
@@ -673,8 +866,10 @@ function viewMe(){
   '<div class="field"><span class="label">Backup</span>' +
   '<textarea class="input" id="me-data" rows="3" placeholder="Your backup appears here. Paste one in to restore."></textarea>' +
   '<div style="display:flex;gap:8px;margin-top:9px"><button class="btn small ghost" id="me-export">Make a backup</button>' +
-  '<button class="btn small ghost" id="me-import">Restore from paste</button></div>' +
-  '<div class="muted" style="font-size:13px;margin-top:8px">Copy the text somewhere safe. This is how you move everything to a self-hosted copy.</div></div>' +
+  '<button class="btn small ghost" id="me-import">Restore from paste</button></div></div>' +
+  '<div class="rule"></div>' +
+  '<button class="btn ghost" id="me-switch">Switch person on this device</button>' +
+  '<div class="muted" style="font-size:13px;margin-top:10px">Useful if two of you share one phone. Each person keeps their own pots.</div>' +
   '<div class="rule"></div>' +
   '<button class="btn ghost" data-act="home">Back to pots</button>';
 }
@@ -722,7 +917,8 @@ function viewHome(){
   if(others.length){
     html += '<div class="rule"></div><div class="eyebrow" style="margin-bottom:9px">Shared pots you can join</div>' +
       others.map(function(x){
-        return '<div class="row"><span class="grow">'+esc(x.name)+'</span>' +
+        return '<div class="row"><span class="grow">'+esc(x.name) +
+        (x.lock?' <span class="tag"><i></i>Passkey</span>':'')+'</span>' +
         '<button class="btn ghost small" data-join="'+x.id+'">Join</button></div>';
       }).join('') +
       '<div class="muted" style="font-size:13px;margin-top:12px">Shared pots are visible to anyone who has the link to this app. Private pots never appear here.</div>';
@@ -784,8 +980,9 @@ function viewWeek(){
 
   if(isShared(potScope(pot.id))){
     var by={}; es.forEach(function(e){ by[e.by]=(by[e.by]||0)+e.points; });
-    html+='<div class="split">'+(pot.members||[]).map(function(m){
-      return '<span class="chip"><span class="dot" style="background:var('+COLORS[m.ci%COLORS.length]+')"></span>'+esc(m.name)+' <strong style="font-weight:600">'+(by[m.id]||0)+'</strong></span>';
+    html+='<div class="split">'+contributors(pot).map(function(m){
+      return '<span class="chip">'+avatarHtml(m.id,m.name,m.ci,20)+esc(m.name) +
+        ' <strong style="font-weight:600">'+(by[m.id]||0)+'</strong></span>';
     }).join('')+'</div>';
   }
 
@@ -836,9 +1033,12 @@ function tallyGrid(pot,es,goal){
 
 function entryRow(pot,e){
   var m=memberOf(pot,e.by);
+  var shared=isShared(potScope(pot.id));
   return '<div class="entry"><span class="t">'+fmtTime(e.ts)+'</span>' +
-    '<span class="dot" style="background:var('+COLORS[m.ci%COLORS.length]+')"></span>' +
-    '<span class="n">'+esc(e.name)+'</span><span class="p">+'+e.points+'</span>' +
+    (shared ? avatarHtml(e.by, m.name, m.ci, 20) : '') +
+    '<span class="n">'+esc(e.name) +
+      (shared ? ' <span class="muted" style="font-size:12.5px">'+esc(m.name)+'</span>' : '') +
+    '</span><span class="p">+'+e.points+'</span>' +
     (e.by===S.me.id?'<button class="x" data-del="'+e.id+'" aria-label="Remove this entry">&times;</button>':'') + '</div>';
 }
 
@@ -856,6 +1056,20 @@ function viewLog(){
     '<div class="stat"><div class="v">'+st.total+'</div><div class="k">points all time</div></div>' +
     '<div class="stat"><div class="v">'+st.weeksHit+'</div><div class="k">weeks hit</div></div>' +
     '<div class="stat"><div class="v">'+st.streak+'</div><div class="k">week streak</div></div></div></div>';
+
+  if(es.length && isShared(potScope(pot.id))){
+    var byP={};
+    es.forEach(function(e){ byP[e.by]=(byP[e.by]||0)+e.points; });
+    var people=contributors(pot).slice().sort(function(a,b){ return (byP[b.id]||0)-(byP[a.id]||0); });
+    html+='<div class="eyebrow" style="margin-bottom:8px">By person this week</div>' +
+      people.map(function(m){
+        var cnt=es.filter(function(e){ return e.by===m.id; }).length;
+        return '<div class="entry">'+avatarHtml(m.id,m.name,m.ci,22) +
+          '<span class="n">'+esc(m.name)+'</span>' +
+          '<span class="p">'+cnt+'&times;</span>' +
+          '<span class="p" style="width:44px;text-align:right">+'+(byP[m.id]||0)+'</span></div>';
+      }).join('') + '<div class="rule"></div>';
+  }
 
   if(es.length){
     var per={};
@@ -947,10 +1161,20 @@ function viewSetup(){
   html+='<div class="rule"></div>';
   if(shared){
     html+='<div class="eyebrow" style="margin-bottom:8px">In this pot</div>' +
-      (pot.members||[]).map(function(m){
-        return '<div class="row"><span class="dot" style="background:var('+COLORS[m.ci%COLORS.length]+')"></span>' +
+      contributors(pot).map(function(m){
+        return '<div class="row">'+avatarHtml(m.id,m.name,m.ci,26) +
           '<span class="grow">'+esc(m.name)+(m.id===S.me.id?' <span class="muted">(you)</span>':'')+'</span></div>';
       }).join('');
+
+    html+='<div class="rule"></div><div class="eyebrow" style="margin-bottom:8px">Passkey</div>' +
+      '<div class="muted" style="font-size:13.5px;margin-bottom:12px">' +
+      (potLocked(pot)
+        ? 'This pot has a passkey. New people need it to join. Anyone already in stays in.'
+        : 'Anyone with the link can join this pot. A passkey means they need a word from you first.') +
+      '</div>' +
+      '<button class="btn ghost" id="hb-lock">'+(potLocked(pot)?'Change passkey':'Set a passkey')+'</button>' +
+      (potLocked(pot) ? '<button class="btn ghost" id="hb-unlock" style="margin-top:10px">Remove passkey</button>' : '') +
+      '<div class="muted" style="font-size:13px;margin-top:10px">It stops accidental joins. It is not encryption — someone determined could still reach the data behind it.</div>';
   } else {
     html+='<div class="eyebrow" style="margin-bottom:8px">Open it up</div>' +
       '<button class="btn ghost" id="hb-share">Make this a shared pot</button>' +
@@ -973,11 +1197,18 @@ function wire(root){
   root.querySelectorAll('[data-tab]').forEach(function(b){
     b.onclick=function(){ S.view=b.dataset.tab; S.offset=0; S.confirm=null; render(); };
   });
-  var cy=root.querySelector('#cf-yes');
-  if(cy){
-    cy.onclick=function(){ var f=S.confirm&&S.confirm.fn; S.confirm=null; render(); if(f) f(); };
-    root.querySelector('#cf-no').onclick=function(){ S.confirm=null; render(); };
-  }
+  root.querySelectorAll('[data-cf]').forEach(function(b){
+    b.onclick=function(){
+      var c=S.confirm; if(!c) return;
+      var opt=c.options[+b.dataset.cf];
+      var fieldEl=root.querySelector('#cf-field');
+      var val=fieldEl?fieldEl.value:null;
+      S.confirm=null; render();
+      if(opt && opt.fn) opt.fn(val);
+    };
+  });
+  var cno=root.querySelector('#cf-no');
+  if(cno) cno.onclick=function(){ S.confirm=null; render(); };
   root.querySelectorAll('[data-act=edithome]').forEach(function(b){
     b.onclick=function(){ S.editHome=!S.editHome; render(); };
   });
@@ -1029,7 +1260,7 @@ function wire(root){
     var join=function(){
       var v=root.querySelector('#wh-name').value.trim();
       if(!v){ toast('Enter a name to continue.'); return; }
-      S.me={id:uid(), name:v};
+      S.me={id:uid(), name:v, ci:S.people.length % COLORS.length};
       S.people=S.people.concat([S.me]);
       S.mypots=[]; S.pots={}; S.entries={};
       Promise.all([ sset('people',S.people,false), sset('current',S.me.id,false), sset('pots:'+S.me.id,[],false) ])
@@ -1038,22 +1269,49 @@ function wire(root){
     whGo.onclick=join;
     root.querySelector('#wh-name').onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); join(); } };
   }
+  function pushIdentity(msg){
+    S.people=S.people.map(function(p){ return p.id===S.me.id?S.me:p; });
+    var writes=[ sset('people',S.people,false) ];
+    S.mypots.forEach(function(p){
+      var pot=S.pots[p.id];
+      if(pot && isShared(p.scope)){
+        var touched=false;
+        (pot.members||[]).forEach(function(m){
+          if(m.id===S.me.id){ m.name=S.me.name; m.ci=S.me.ci||0; touched=true; }
+        });
+        if(touched) writes.push(savePot(pot));
+      }
+    });
+    return Promise.all(writes).then(function(){ toast(msg); render(); });
+  }
+  root.querySelectorAll('[data-ci]').forEach(function(b){
+    b.onclick=function(){
+      S.me.ci=+b.dataset.ci;
+      pushIdentity('Colour updated');
+    };
+  });
+  var photo=root.querySelector('#me-photo');
+  if(photo) photo.onchange=function(){
+    var f=photo.files && photo.files[0];
+    if(!f) return;
+    shrinkImage(f, 96).then(function(dataUrl){
+      S.avatars[S.me.id]=dataUrl;
+      return sset(avatarKey(S.me.id), dataUrl, true);
+    }).then(function(){ toast('Photo updated'); render(); })
+      .catch(function(){ toast('Could not read that image. Try a different one.'); });
+  };
+  var photoClear=root.querySelector('#me-photo-clear');
+  if(photoClear) photoClear.onclick=function(){
+    S.avatars[S.me.id]=null;
+    sdel(avatarKey(S.me.id), true).then(function(){ toast('Photo removed'); render(); });
+  };
   var meSave=root.querySelector('#me-save');
   if(meSave){
     meSave.onclick=function(){
       var v=root.querySelector('#me-name').value.trim();
       if(!v) return;
       S.me.name=v;
-      S.people=S.people.map(function(p){ return p.id===S.me.id?S.me:p; });
-      var writes=[ sset('people',S.people,false) ];
-      S.mypots.forEach(function(p){
-        var pot=S.pots[p.id];
-        if(pot && isShared(p.scope)){
-          (pot.members||[]).forEach(function(m){ if(m.id===S.me.id) m.name=v; });
-          writes.push(savePot(pot));
-        }
-      });
-      Promise.all(writes).then(function(){ toast('Name updated'); S.view='home'; render(); });
+      pushIdentity('Name updated').then(function(){ S.view='home'; render(); });
     };
     var identSave=root.querySelector('#me-ident-save');
     if(identSave) identSave.onclick=function(){
@@ -1094,21 +1352,32 @@ function wire(root){
   root.querySelectorAll('[data-join]').forEach(function(b){
     b.onclick=function(){
       var id=b.dataset.join;
-      b.disabled=true;
       sget('pot:'+id,true).then(function(pot){
         if(!pot){ toast('That pot has gone missing.'); return; }
+        if(potLocked(pot)){
+          askChoice('"'+pot.name+'" has a passkey. Ask whoever set it up for the word.',
+            [{label:'Join pot', fn:function(entered){
+              if(!entered || hashKey(entered)!==pot.lock.h){ toast('That passkey doesn\'t match.'); return; }
+              doJoin(pot);
+            }}], {field:'Passkey', password:true});
+          return;
+        }
+        doJoin(pot);
+      });
+    };
+    function doJoin(pot){
+        var id=pot.id;
         var ms=pot.members||[];
         if(!ms.some(function(m){ return m.id===S.me.id; })){
-          ms.push({id:S.me.id,name:S.me.name,ci:ms.length});
+          ms.push({id:S.me.id,name:S.me.name,ci:S.me.ci||0});
           pot.members=ms;
         }
         S.pots[id]=pot;
         S.mypots=S.mypots.concat([{id:id,scope:'shared'}]);
-        return Promise.all([ sset('pot:'+id,pot,true), saveMyPots() ]).then(function(){
+        Promise.all([ sset('pot:'+id,pot,true), saveMyPots() ]).then(function(){
           return loadEntries(id,'shared');
         }).then(function(){ toast('Joined '+pot.name); render(); });
-      });
-    };
+    }
   });
 
   /* new pot */
@@ -1174,7 +1443,7 @@ function wire(root){
         id:id, name:name, scope:scope,
         habits: chosen.map(function(n){ return {id:uid(), name:n, points:1}; }),
         goalHistory:[{from:weekKeyOf(new Date()), goal:goal}],
-        members:[{id:S.me.id, name:S.me.name, ci:0}],
+        members:[{id:S.me.id, name:S.me.name, ci:S.me.ci||0}],
         createdAt: Date.now()
       };
       S.pots[id]=pot;
@@ -1226,7 +1495,22 @@ function wire(root){
     root.querySelectorAll('[data-arch]').forEach(function(b){
       b.onclick=function(){
         var h=habitIn(pot,b.dataset.arch); if(!h) return;
-        h.archived=true; savePot(pot).then(function(){ render(); toast(h.name+' retired'); });
+        var used=potEntries(pot.id).filter(function(e){ return e.habitId===h.id; }).length;
+        function del(){
+          pot.habits=(pot.habits||[]).filter(function(x){ return x.id!==h.id; });
+          savePot(pot).then(function(){ render(); toast(h.name+' deleted'); });
+        }
+        function retire(){
+          h.archived=true;
+          savePot(pot).then(function(){ render(); toast(h.name+' retired'); });
+        }
+        if(!used){
+          askChoice('Delete "'+h.name+'"? Nothing has been logged against it, so nothing is lost.',
+            [{label:'Delete', fn:del}]);
+        } else {
+          askChoice('"'+h.name+'" has '+used+' logged '+(used===1?'entry':'entries')+'. Retiring hides the button but keeps it available to bring back. Deleting removes it from the list — the points already logged stay either way.',
+            [{label:'Retire', fn:retire},{label:'Delete', fn:del}]);
+        }
       };
     });
     root.querySelectorAll('[data-unarch]').forEach(function(b){
@@ -1264,6 +1548,33 @@ function wire(root){
         sh?'Leave pot':'Delete pot',
         function(){ removePot(pot.id,false); });
     };
+    var lockBtn=root.querySelector('#hb-lock');
+    if(lockBtn) lockBtn.onclick=function(){
+      askChoice('Pick a passkey for "'+pot.name+'". Anyone joining from now on will need it.',
+        [{label:'Save passkey', fn:function(val){
+          val=(val||'').trim();
+          if(val.length<3){ toast('Use at least three characters.'); return; }
+          pot.lock={h:hashKey(val)};
+          savePot(pot).then(function(){
+            return sget('index',true).then(function(ix){
+              ix=(ix||[]).map(function(x){ return x.id===pot.id?{id:x.id,name:x.name,lock:true}:x; });
+              S.index=ix; return sset('index',ix,true);
+            });
+          }).then(function(){ toast('Passkey set'); render(); });
+        }}], {field:'Passkey', password:true});
+    };
+    var unlockBtn=root.querySelector('#hb-unlock');
+    if(unlockBtn) unlockBtn.onclick=function(){
+      askConfirm('Remove the passkey from "'+pot.name+'"? Anyone with the link will be able to join again.','Remove it',function(){
+        delete pot.lock;
+        savePot(pot).then(function(){
+          return sget('index',true).then(function(ix){
+            ix=(ix||[]).map(function(x){ return x.id===pot.id?{id:x.id,name:x.name}:x; });
+            S.index=ix; return sset('index',ix,true);
+          });
+        }).then(function(){ toast('Passkey removed'); render(); });
+      });
+    };
     var nuke=root.querySelector('#hb-nuke');
     if(nuke) nuke.onclick=function(){
       askConfirm('Delete "'+pot.name+'" for everyone? The pot and its entire log go for good.','Delete for everyone',
@@ -1274,6 +1585,15 @@ function wire(root){
 
 
 boot();
+
+window.addEventListener('online', function(){ flushQueue().then(function(){ if(S.me) refresh(); }); });
+if(pendingCount()) setTimeout(flushQueue, 1500);
+
+if('serviceWorker' in navigator && location.protocol === 'https:'){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
 })();
 </script>
 </body>
