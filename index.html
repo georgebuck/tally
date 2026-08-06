@@ -101,10 +101,15 @@ button{touch-action:manipulation}
 
 /* ---------- tally grid ---------- */
 .tally{display:grid;gap:5px;margin:4px 0 16px}
-.cell{aspect-ratio:1/1;border:1.5px solid var(--rule);border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:#fff;font-weight:500;padding:0;overflow:hidden}
+.cell{position:relative;display:block;width:100%;min-width:0;aspect-ratio:1/1;
+  border:1.5px solid var(--rule);border-radius:4px;background:var(--card);
+  padding:0;overflow:hidden}
+.cell .in{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;color:#fff;font-weight:500;line-height:1}
+.cell img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .cell.empty{background:transparent;border-style:dashed}
-.cell.filled{border-color:var(--ink);box-shadow:1.5px 1.5px 0 var(--ink)}
-.cell.bonus{border-color:var(--gold);box-shadow:1.5px 1.5px 0 var(--gold)}
+.cell.filled{border-color:var(--ink)}
+.cell.bonus{border-color:var(--gold)}
 .cell.pop{animation:stamp .26s cubic-bezier(.2,1.5,.4,1)}
 @keyframes stamp{0%{transform:scale(.4) rotate(-9deg);opacity:0}60%{transform:scale(1.12) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 .bonusrule{grid-column:1/-1;height:1px;background:var(--gold);margin:5px 0 1px;opacity:.6}
@@ -229,7 +234,8 @@ var S = {
   confirm: null,
   editHome: false,
   missing: {},
-  avatars: {}
+  avatars: {},
+  avatarAt: {}
 };
 var COLORS = ['--c0','--c1','--c2','--c3','--c4','--c5'];
 var PRESETS = ['Go to the gym','Read for 30 minutes','Meditate','Clean the house','Cook a meal','Sleep before 11pm','Walk outside','Stretch','No phone in bed','Journal','Call family','Practice an instrument'];
@@ -389,10 +395,17 @@ function slist(prefix, shared){
 /* ---------- avatars ---------- */
 function avatarKey(pid){ return 'avatar:'+pid; }
 function loadAvatars(ids){
-  var want=ids.filter(function(id){ return !(id in S.avatars); });
+  var now=Date.now(), TTL=5*60*1000;
+  var want=ids.filter(function(id){
+    if(!S.avatars[id]) return true;                       // none known yet, or none set — keep looking
+    return (now-(S.avatarAt[id]||0)) > TTL;               // known photo, recheck occasionally
+  });
   if(!want.length) return Promise.resolve();
   return Promise.all(want.map(function(id){
-    return sget(avatarKey(id), true).then(function(v){ S.avatars[id]= v || null; });
+    return sget(avatarKey(id), true).then(function(v){
+      S.avatars[id]= v || null;
+      S.avatarAt[id]=Date.now();
+    });
   }));
 }
 function avatarHtml(pid, name, ci, size){
@@ -762,7 +775,18 @@ function syncAvatars(){
   if(!isShared(potScope(pot.id))) return Promise.resolve();
   return loadAvatars(contributors(pot).map(function(m){ return m.id; })).then(render);
 }
-function goHome(){ S.potId=null; S.view='home'; S.offset=0; render(); loadAll().then(render); }
+function goHome(){
+  S.potId=null; S.view='home'; S.offset=0; render();
+  loadAll().then(function(){ render(); return homeAvatars(); });
+}
+function homeAvatars(){
+  var ids={};
+  S.mypots.forEach(function(p){
+    if(!isShared(p.scope)) return;
+    weekEntries(p.id,0).forEach(function(e){ ids[e.by]=1; });
+  });
+  return loadAvatars(Object.keys(ids)).then(render);
+}
 
 /* =========================================================
    render
@@ -932,7 +956,12 @@ function miniStrip(potId, goal){
   es.forEach(function(e){ for(var i=0;i<e.points;i++) cells.push(e); });
   var pot=S.pots[potId], n=Math.min(goal,40), out='<div class="mini">';
   for(var i=0;i<n;i++){
-    if(i<cells.length) out += '<i class="f" style="background:'+colorVar(pot,cells[i].by)+'"></i>';
+    if(i<cells.length){
+      var ph=S.avatars[cells[i].by];
+      out += ph
+        ? '<i class="f" style="background-image:url('+ph+');background-size:cover;background-position:center"></i>'
+        : '<i class="f" style="background:'+colorVar(pot,cells[i].by)+'"></i>';
+    }
     else out += '<i></i>';
   }
   return out+'</div>';
@@ -1017,22 +1046,31 @@ function tallyGrid(pot,es,goal){
   es.forEach(function(e){ for(var i=0;i<e.points;i++) cells.push(e); });
   var size = goal<=12?42:goal<=24?32:goal<=40?25:19;
   var out='<div class="tally" style="grid-template-columns:repeat(auto-fill,minmax('+size+'px,1fr))">';
-  var i,e,m;
+  var i, last=cells.length-1;
   for(i=0;i<Math.min(cells.length,goal);i++){
-    e=cells[i]; m=memberOf(pot,e.by);
-    out+='<div class="cell filled'+(e.id===S.justAdded&&i===cells.length-1?' pop':'')+'" style="background:var('+COLORS[m.ci%COLORS.length]+')" title="'+esc(m.name+' — '+e.name+' — '+fmtDay(e.ts)+' '+fmtTime(e.ts))+'">'+(size>=25?esc(initials(m.name)):'')+'</div>';
+    out+=cellHtml(pot, cells[i], 'filled', cells[i].id===S.justAdded && i===last, size);
   }
   for(i=cells.length;i<goal;i++) out+='<div class="cell empty"></div>';
   if(cells.length>goal){
     out+='<div class="bonusrule"></div>';
     for(i=goal;i<cells.length;i++){
-      e=cells[i]; m=memberOf(pot,e.by);
-      out+='<div class="cell bonus'+(e.id===S.justAdded&&i===cells.length-1?' pop':'')+'" style="background:var('+COLORS[m.ci%COLORS.length]+')" title="'+esc(m.name+' — '+e.name+' — bonus')+'">'+(size>=25?esc(initials(m.name)):'')+'</div>';
+      out+=cellHtml(pot, cells[i], 'bonus', cells[i].id===S.justAdded && i===last, size);
     }
   }
   return out+'</div>';
 }
 
+function cellHtml(pot, e, kind, pop, size){
+  var m=memberOf(pot, e.by);
+  var col='var('+COLORS[m.ci%COLORS.length]+')';
+  var photo=S.avatars[e.by];
+  var ring = photo ? ';box-shadow:inset 0 0 0 2px '+col : '';
+  var inner = photo
+    ? '<img src="'+photo+'" alt="">'
+    : (size>=22 ? '<span class="in">'+esc(initials(m.name))+'</span>' : '');
+  return '<div class="cell '+kind+(pop?' pop':'')+'" style="background:'+col+ring+'" ' +
+    'title="'+esc(m.name+' — '+e.name+' — '+fmtDay(e.ts)+' '+fmtTime(e.ts))+'">'+inner+'</div>';
+}
 function entryRow(pot,e){
   var m=memberOf(pot,e.by);
   var shared=isShared(potScope(pot.id));
